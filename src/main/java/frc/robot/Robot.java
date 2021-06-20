@@ -1,9 +1,9 @@
 // Copyright (c) FIRST and other WPILib contributors.
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
-
 package frc.robot;
 
+// WPILib Imports
 import edu.wpi.first.wpilibj.TimedRobot;
 
 // Systems
@@ -14,6 +14,9 @@ import frc.robot.systems.FSMSystem;
  * each mode, as described in the TimedRobot documentation.
  */
 public class Robot extends TimedRobot {
+	private TeleopInput input;
+
+	// Systems
 	private FSMSystem fsmSystem;
 
 	/**
@@ -22,33 +25,38 @@ public class Robot extends TimedRobot {
 	 */
 	@Override
 	public void robotInit() {
-		System.out.println("Hello world");
+		System.out.println("robotInit");
+		input = new TeleopInput();
+
+		// Instantiate all systems here
 		fsmSystem = new FSMSystem();
 	}
 
 	@Override
 	public void autonomousInit() {
-
+		System.out.println("-------- Autonomous Init --------");
+		fsmSystem.reset();
 	}
 
 	@Override
 	public void autonomousPeriodic() {
-
+		fsmSystem.update(null);
 	}
 
 	@Override
 	public void teleopInit() {
-
+		System.out.println("-------- Teleop Init --------");
+		fsmSystem.reset();
 	}
 
 	@Override
 	public void teleopPeriodic() {
-		fsmSystem.updateTeleop();
+		fsmSystem.update(input);
 	}
 
 	@Override
 	public void disabledInit() {
-
+		System.out.println("-------- Disabled Init --------");
 	}
 
 	@Override
@@ -58,7 +66,7 @@ public class Robot extends TimedRobot {
 
 	@Override
 	public void testInit() {
-
+		System.out.println("-------- Test Init --------");
 	}
 
 	@Override
