@@ -17,11 +17,13 @@ public class FSMSystem {
 		OTHER_STATE
 	}
 
-	private static final float MOTOR_RUN_POWER = 0.1;
+	private static final float MOTOR_RUN_POWER = 0.1f;
 
 	/* ======================== Private variables ======================== */
 	private FSMState currentState;
 
+	// Hardware devices should be owned by one and only one system. They must
+	// be private to their owner system and may not be used elsewhere.
 	private CANSparkMax exampleMotor;
 
 	/* ======================== Constructor ======================== */
@@ -82,12 +84,12 @@ public class FSMSystem {
 		currentState = nextState(input);
 	}
 
-	// TODO: How much IPC to allow? Only current state or other stuff as well?
-
 	/* ======================== Private methods ======================== */
 	/**
 	 * Decide the next state to transition to. This is a function of the inputs
-	 * and the current state of this FSM.
+	 * and the current state of this FSM. This method should not have any side
+	 * effects on outputs. In other words, this method should only read or get
+	 * values to decide what state to go to.
 	 * @param input Global TeleopInput if robot in teleop mode or null if
 	 *        the robot is in autonomous mode.
 	 * @return FSM state for the next iteration
