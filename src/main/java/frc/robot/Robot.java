@@ -73,4 +73,17 @@ public class Robot extends TimedRobot {
 	public void testPeriodic() {
 
 	}
+
+	/* Simulation mode handlers, only used for simulation testing  */
+	@Override
+	public void simulationInit() {
+		System.out.println("-------- Simulation Init --------");
+	}
+
+	@Override
+	public void simulationPeriodic() {}
+
+	// Do not use robotPeriodic. Use mode specific periodic methods instead.
+	@Override
+	public void robotPeriodic() {};
 }

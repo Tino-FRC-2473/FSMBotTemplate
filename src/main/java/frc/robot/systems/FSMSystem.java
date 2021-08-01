@@ -60,7 +60,8 @@ public class FSMSystem {
 	public void reset() {
 		currentState = FSMState.START_STATE;
 
-		// TODO: Do we allow functionality here? Or call handleStartState()? or update()?
+		// Call one tick of update to ensure outputs reflect start state
+		update(null);
 	}
 	/**
 	 * Update FSM based on new inputs. This function only calls the FSM state
@@ -97,7 +98,7 @@ public class FSMSystem {
 	private FSMState nextState(TeleopInput input) {
 		switch (currentState) {
 			case START_STATE:
-				if (input.isShooterButtonPressed()) {
+				if (input != null) {
 					return FSMState.OTHER_STATE;
 				} else {
 					return FSMState.START_STATE;

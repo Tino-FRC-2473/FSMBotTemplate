@@ -38,11 +38,6 @@ public class TeleopInput {
 	// Method names should be descriptive of the behavior, so the
 	// control mapping is hidden from other classes.
 
-	// TODO: Is it necessary to cache the input values? Mainly question of whether
-	// input values can change in the middle of a run loop tick. Can we have
-	// situation where system A's update sees button pressed, but system B's
-	// update sees button released?
-
 	/* ------------------------ Left Joystick ------------------------ */
 	/**
 	 * Get X axis of Left Joystick.
