@@ -3,11 +3,10 @@ package frc.robot.systems;
 // WPILib Imports
 
 // Third party Hardware Imports
-import com.revrobotics.CANSparkMax;
 
 // Robot Imports
 import frc.robot.TeleopInput;
-import frc.robot.HardwareMap;
+//import frc.robot.HardwareMap;
 
 public class FSMSystem {
 	/* ======================== Constants ======================== */
@@ -17,14 +16,15 @@ public class FSMSystem {
 		OTHER_STATE
 	}
 
-	private static final float MOTOR_RUN_POWER = 0.1f;
+	private static final int LOOP_COUNTER = 100;
 
 	/* ======================== Private variables ======================== */
 	private FSMState currentState;
 
 	// Hardware devices should be owned by one and only one system. They must
 	// be private to their owner system and may not be used elsewhere.
-	private CANSparkMax exampleMotor;
+
+	private int counter = 0;
 
 	/* ======================== Constructor ======================== */
 	/**
@@ -34,8 +34,6 @@ public class FSMSystem {
 	 */
 	public FSMSystem() {
 		// Perform hardware init
-		exampleMotor = new CANSparkMax(HardwareMap.CAN_ID_SPARK_SHOOTER,
-										CANSparkMax.MotorType.kBrushless);
 
 		// Reset state machine
 		reset();
@@ -86,6 +84,10 @@ public class FSMSystem {
 	}
 
 	/* ======================== Private methods ======================== */
+	private void counterPrint() {
+		System.out.println("Running!");
+	}
+
 	/**
 	 * Decide the next state to transition to. This is a function of the inputs
 	 * and the current state of this FSM. This method should not have any side
@@ -119,7 +121,7 @@ public class FSMSystem {
 	 *        the robot is in autonomous mode.
 	 */
 	private void handleStartState(TeleopInput input) {
-		exampleMotor.set(0);
+		counter = 0;
 	}
 	/**
 	 * Handle behavior in OTHER_STATE.
@@ -127,6 +129,9 @@ public class FSMSystem {
 	 *        the robot is in autonomous mode.
 	 */
 	private void handleOtherState(TeleopInput input) {
-		exampleMotor.set(MOTOR_RUN_POWER);
+		counter++;
+		if (counter % LOOP_COUNTER == 0) {
+			this.counterPrint();
+		}
 	}
 }

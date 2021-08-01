@@ -46,6 +46,7 @@ public class Robot extends TimedRobot {
 	@Override
 	public void teleopInit() {
 		System.out.println("-------- Teleop Init --------");
+		System.out.println("Hello world!");
 		fsmSystem.reset();
 	}
 
