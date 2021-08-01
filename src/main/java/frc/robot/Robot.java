@@ -81,9 +81,9 @@ public class Robot extends TimedRobot {
 	}
 
 	@Override
-	public void simulationPeriodic() {}
+	public void simulationPeriodic() { }
 
 	// Do not use robotPeriodic. Use mode specific periodic methods instead.
 	@Override
-	public void robotPeriodic() {};
+	public void robotPeriodic() { }
 }
