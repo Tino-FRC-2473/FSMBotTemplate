@@ -10,5 +10,5 @@ public final class HardwareMap {
 	// Pneumatics channel numbers
 
 	// Digital output channel numbers
-	// DEFINE CONSTANT HERE
+	// TODO: Define light relay channel
 }
