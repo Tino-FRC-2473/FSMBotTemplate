@@ -16,7 +16,7 @@ For this lesson, we'll be creating a simple light switch using the FSMSystem. In
 ## Hardware Definition
 The first step is to define and intialize the hardware that our light switch system will be controlling. For this example, the light will be turned on an off by a relay controlled by a [DigitalOutput](https://first.wpi.edu/FRC/roborio/release/docs/java/edu/wpi/first/wpilibj/DigitalOutput.html) channel on the roboRio.
 
-A DigitalOutput called `lightRelay` has already been defined for you in `LightSystem`. However, it still needs to be instantiated. Assign a channel number for this digital output in `HardwareMap` and add the instantiation of `lightRelay` in LightSystem's constructor.
+A DigitalOutput called `lightRelay` has already been defined for you in `LightSystem`. However, it still needs to be instantiated. Assign a channel number for this digital output in `HardwareMap` and add the instantiation of `lightRelay` in LightSystem's constructor. Remember that the channel number is a constant, so mark it `static final`.
 
 # Input Definition
 Next, let's choose the inputs we want to use. We'll be using the buttons on a [Joystick](https://first.wpi.edu/FRC/roborio/release/docs/java/edu/wpi/first/wpilibj/Joystick.html) to turn our light on and off. In TeleopInput.java, a Joystick has already been created and instantiated for you. You just need to fill out the getter methods `isOnButtonPressed()` and `isOffButtonPressed()`. Remember which button IDs you used for on and off, we'll need this for testing.

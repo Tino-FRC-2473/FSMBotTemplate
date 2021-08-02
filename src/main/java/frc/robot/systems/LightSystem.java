@@ -90,6 +90,11 @@ public class LightSystem {
 	 * @return FSM state for the next iteration
 	 */
 	private FSMState nextState(TeleopInput input) {
+		// Do not run in Autonomous
+		if (input == null) {
+			return currentState;
+		}
+
 		// TODO: Define state transitions
 		switch (currentState) {
 			case START_STATE:
