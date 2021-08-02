@@ -32,7 +32,7 @@ Finally, define the state transitions in `nextState()`. You can access button va
 Now that our system is defined, let's add it to the scheduling methods in Robot.java. First, make sure we instantiate our LightSystem when the robot boots in `robotInit`. Then update the teleop scheduling functions `teleopInit()` and `teleopPeriodic()` to reset and update our system as expected.
 
 ## Testing
-When you think you have everything sorted out and your code builds succesfully, give it a run in the simulator. If you don't have a real Joystick connected to your computer, the Simulator lets you use keyboard keys as a substitute. See the [WPILib docs](https://docs.wpilib.org/en/stable/docs/software/wpilib-tools/robot-simulation/simulation-gui.html#adding-a-system-joystick-to-joysticks) for a guide on how to do this.
+When you think you have everything sorted out and your code builds succesfully, give it a run in the simulator. If you don't have a real Joystick connected to your computer, the Simulator lets you use keyboard keys as a substitute. See the [WPILib docs](https://docs.wpilib.org/en/stable/docs/software/wpilib-tools/robot-simulation/simulation-gui.html#adding-a-system-joystick-to-joysticks) for a guide on how to do this. Select Hardware->DIO to show the simulated digital output values.
 
 Switch into Teleop mode, and press the buttons you assigned to on and off. Does the light react as you expect?
 
