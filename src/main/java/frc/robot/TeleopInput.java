@@ -13,13 +13,11 @@ import edu.wpi.first.wpilibj.Joystick;
  */
 public class TeleopInput {
 	/* ======================== Constants ======================== */
-	private static final int LEFT_JOYSTICK_PORT = 0;
-	private static final int RIGHT_JOYSTICK_PORT = 1;
+	private static final int JOYSTICK_PORT = 0;
 
 	/* ======================== Private variables ======================== */
 	// Input objects
-	private Joystick leftJoystick;
-	private Joystick rightJoystick;
+	private Joystick joystick;
 
 	/* ======================== Constructor ======================== */
 	/**
@@ -28,9 +26,7 @@ public class TeleopInput {
 	 * by WPILib until teleop mode.
 	 */
 	public TeleopInput() {
-		leftJoystick = new Joystick(LEFT_JOYSTICK_PORT);
-
-		rightJoystick = new Joystick(RIGHT_JOYSTICK_PORT);
+		joystick = new Joystick(JOYSTICK_PORT);
 	}
 
 	/* ======================== Public methods ======================== */
@@ -38,50 +34,20 @@ public class TeleopInput {
 	// Method names should be descriptive of the behavior, so the
 	// control mapping is hidden from other classes.
 
-	/* ------------------------ Left Joystick ------------------------ */
+	/* ------------------------ Joystick ------------------------ */
 	/**
-	 * Get X axis of Left Joystick.
-	 * @return Axis value
-	 */
-	public double getLeftJoystickX() {
-		return leftJoystick.getX(GenericHID.Hand.kLeft);
-	}
-	/**
-	 * Get Y axis of Left Joystick.
-	 * @return Axis value
-	 */
-	public double getLeftJoystickY() {
-		return leftJoystick.getY(GenericHID.Hand.kLeft);
-	}
-	/**
-	 * Get the value of the shooter button.
+	 * Get the value of the on button.
 	 * @return True if button is pressed
 	 */
-	public boolean isShooterButtonPressed() {
-		return leftJoystick.getRawButton(1);
+	public boolean isOnButtonPressed() {
+		return // TODO: Get button value
 	}
 	/**
-	 * Get the value of the intake button.
+	 * Get the value of the off button.
 	 * @return True if button is pressed
 	 */
-	public boolean isIntakeButtonPressed() {
-		return leftJoystick.getRawButton(2);
-	}
-
-	/* ------------------------ Right Joystick ------------------------ */
-	/**
-	 * Get X axis of Right Joystick.
-	 * @return Axis value
-	 */
-	public double getRightJoystickX() {
-		return rightJoystick.getX(GenericHID.Hand.kRight);
-	}
-	/**
-	 * Get Y axis of Right Joystick.
-	 * @return Axis value
-	 */
-	public double getRightJoystickY() {
-		return rightJoystick.getY(GenericHID.Hand.kRight);
+	public boolean isOffButtonPressed() {
+		return // TODO: Get button value
 	}
 
 	/* ======================== Private methods ======================== */
