@@ -8,6 +8,7 @@ import edu.wpi.first.wpilibj.TimedRobot;
 
 // Systems
 import frc.robot.systems.FSMSystem;
+import frc.robot.systems.AutoHandlerSystem;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -18,6 +19,7 @@ public class Robot extends TimedRobot {
 
 	// Systems
 	private FSMSystem fsmSystem;
+	private AutoHandlerSystem autoHandler;
 
 	/**
 	 * This function is run when the robot is first started up and should be used for any
@@ -30,17 +32,18 @@ public class Robot extends TimedRobot {
 
 		// Instantiate all systems here
 		fsmSystem = new FSMSystem();
+		autoHandler = new AutoHandlerSystem(fsmSystem);
 	}
 
 	@Override
 	public void autonomousInit() {
 		System.out.println("-------- Autonomous Init --------");
-		fsmSystem.reset();
+		autoHandler.reset(1);
 	}
 
 	@Override
 	public void autonomousPeriodic() {
-		fsmSystem.update(null);
+		autoHandler.update();
 	}
 
 	@Override
