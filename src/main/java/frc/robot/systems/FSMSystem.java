@@ -89,6 +89,7 @@ public class FSMSystem {
 
 	/**
 	 * Performs specific action based on the autoState passed in.
+	 * @param autoState autoState that the subsystem executes.
 	 * @return if the action carried out in this state has finished executing
 	 */
 	public boolean updateAutonomous(AutoFSMState autoState) {
