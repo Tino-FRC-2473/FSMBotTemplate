@@ -9,7 +9,7 @@ import edu.wpi.first.wpilibj.TimedRobot;
 // Systems
 import frc.robot.systems.FSMSystem;
 import frc.robot.systems.AutoHandlerSystem;
-import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
+import frc.robot.systems.AutoHandlerSystem.AutoPathIndex;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -17,16 +17,6 @@ import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
  */
 public class Robot extends TimedRobot {
 	private TeleopInput input;
-
-	//Predefined auto paths
-	private static final AutoFSMState[] PATH1 = new AutoFSMState[]{
-		AutoFSMState.STATE1, AutoFSMState.STATE2, AutoFSMState.STATE3};
-
-	private static final AutoFSMState[] PATH2 = new AutoFSMState[]{
-		AutoFSMState.STATE3, AutoFSMState.STATE2, AutoFSMState.STATE1};
-
-	private static final AutoFSMState[] PATH3 = new AutoFSMState[]{
-		AutoFSMState.STATE1, AutoFSMState.STATE3, AutoFSMState.STATE2};
 
 	// Systems
 	private FSMSystem fsmSystem;
@@ -49,7 +39,7 @@ public class Robot extends TimedRobot {
 	@Override
 	public void autonomousInit() {
 		System.out.println("-------- Autonomous Init --------");
-		autoHandler.reset(PATH1);
+		autoHandler.reset(AutoPathIndex.PATH1);
 	}
 
 	@Override

@@ -8,6 +8,11 @@ public class AutoHandlerSystem {
 		STATE2,
 		STATE3
 	}
+	public enum AutoPathIndex {
+		PATH1,
+		PATH2,
+		PATH3
+	}
 
 	/* ======================== Private variables ======================== */
 	//Contains the sequential list of states in the current auto path that must be executed
@@ -22,6 +27,15 @@ public class AutoHandlerSystem {
 	//FSM Systems that the autoHandlerFSM uses
 	private FSMSystem subsystem1;
 
+	//Predefined auto paths
+	private static final AutoFSMState[] PATH1 = new AutoFSMState[]{
+		AutoFSMState.STATE1, AutoFSMState.STATE2, AutoFSMState.STATE3};
+
+	private static final AutoFSMState[] PATH2 = new AutoFSMState[]{
+		AutoFSMState.STATE3, AutoFSMState.STATE2, AutoFSMState.STATE1};
+
+	private static final AutoFSMState[] PATH3 = new AutoFSMState[]{
+		AutoFSMState.STATE1, AutoFSMState.STATE3, AutoFSMState.STATE2};
 	/* ======================== Constructor ======================== */
 	/**
 	 * Create FSMSystem and initialize to starting state.
@@ -50,10 +64,16 @@ public class AutoHandlerSystem {
 	 * Ex. if the robot is enabled, disabled, then reenabled.
 	 * @param path the auto path to be executed
 	 */
-	public void reset(AutoFSMState[] path) {
+	public void reset(AutoPathIndex path) {
 		currentStateIndex = 0;
 		isCurrentStateFinished = false;
-		currentStateList = path;
+		if (path == AutoPathIndex.PATH1) {
+			currentStateList = PATH1;
+		} else if (path == AutoPathIndex.PATH2) {
+			currentStateList = PATH2;
+		} else if (path == AutoPathIndex.PATH3) {
+			currentStateList = PATH3;
+		}
 	}
 
 	/**
