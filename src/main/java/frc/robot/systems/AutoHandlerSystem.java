@@ -68,6 +68,10 @@ public class AutoHandlerSystem {
 	 * @param path the auto path to be executed
 	 */
 	public void reset(AutoPath path) {
+		subsystem1.reset();
+		subsystem2.reset();
+		subsystem3.reset();
+
 		currentStateIndex = 0;
 		if (path == AutoPath.PATH1) {
 			currentStateList = PATH1;
@@ -81,8 +85,6 @@ public class AutoHandlerSystem {
 	/**
 	 * This function runs the auto's current state.
 	 */
-	//&& has boolean short circuiting
-	//& doesn't have boolean short circuiting
 	public void update() {
 		if (currentStateIndex >= currentStateList.length) {
 			return;
