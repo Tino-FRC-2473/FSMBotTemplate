@@ -8,7 +8,7 @@ public class AutoHandlerSystem {
 		STATE2,
 		STATE3
 	}
-	public enum AutoPathIndex {
+	public enum AutoPath {
 		PATH1,
 		PATH2,
 		PATH3
@@ -21,11 +21,10 @@ public class AutoHandlerSystem {
 	//The index in the currentStateList where the currentState is at
 	private int currentStateIndex;
 
-	//Stores if the current state has finished executing or not
-	private boolean isCurrentStateFinished;
-
 	//FSM Systems that the autoHandlerFSM uses
 	private FSMSystem subsystem1;
+	private FSMSystem subsystem2;
+	private FSMSystem subsystem3;
 
 	//Predefined auto paths
 	private static final AutoFSMState[] PATH1 = new AutoFSMState[]{
@@ -40,10 +39,14 @@ public class AutoHandlerSystem {
 	/**
 	 * Create FSMSystem and initialize to starting state.
 	 * Initializes any subsystems such as driveFSM, armFSM, ect.
-	 * @param fsm1 the subsystem that the auto handler will call functions on
+	 * @param fsm1 the first subsystem that the auto handler will call functions on
+	 * @param fsm2 the second subsystem that the auto handler will call functions on
+	 * @param fsm3 the third subsystem that the auto handler will call functions on
 	 */
-	public AutoHandlerSystem(FSMSystem fsm1) {
+	public AutoHandlerSystem(FSMSystem fsm1, FSMSystem fsm2, FSMSystem fsm3) {
 		subsystem1 = fsm1;
+		subsystem2 = fsm2;
+		subsystem3 = fsm3;
 	}
 
 	/* ======================== Public methods ======================== */
@@ -64,14 +67,13 @@ public class AutoHandlerSystem {
 	 * Ex. if the robot is enabled, disabled, then reenabled.
 	 * @param path the auto path to be executed
 	 */
-	public void reset(AutoPathIndex path) {
+	public void reset(AutoPath path) {
 		currentStateIndex = 0;
-		isCurrentStateFinished = false;
-		if (path == AutoPathIndex.PATH1) {
+		if (path == AutoPath.PATH1) {
 			currentStateList = PATH1;
-		} else if (path == AutoPathIndex.PATH2) {
+		} else if (path == AutoPath.PATH2) {
 			currentStateList = PATH2;
-		} else if (path == AutoPathIndex.PATH3) {
+		} else if (path == AutoPath.PATH3) {
 			currentStateList = PATH3;
 		}
 	}
@@ -85,32 +87,30 @@ public class AutoHandlerSystem {
 		if (currentStateIndex >= currentStateList.length) {
 			return;
 		}
+
+		boolean isCurrentStateFinished;
 		System.out.println("In State: " + getCurrentState());
 		switch (getCurrentState()) {
 			case STATE1:
-				isCurrentStateFinished = subsystem1.updateAutonomous(AutoFSMState.STATE1);
+				isCurrentStateFinished = subsystem1.updateAutonomous(AutoFSMState.STATE1)
+					&& subsystem2.updateAutonomous(AutoFSMState.STATE1)
+					&& subsystem3.updateAutonomous(AutoFSMState.STATE1);
 				break;
 			case STATE2:
-				isCurrentStateFinished = subsystem1.updateAutonomous(AutoFSMState.STATE2);
+				isCurrentStateFinished = subsystem1.updateAutonomous(AutoFSMState.STATE2)
+					&& subsystem2.updateAutonomous(AutoFSMState.STATE2)
+					&& subsystem3.updateAutonomous(AutoFSMState.STATE2);
 				break;
 			case STATE3:
-				isCurrentStateFinished = subsystem1.updateAutonomous(AutoFSMState.STATE3);
+				isCurrentStateFinished = subsystem1.updateAutonomous(AutoFSMState.STATE3)
+					&& subsystem2.updateAutonomous(AutoFSMState.STATE3)
+					&& subsystem3.updateAutonomous(AutoFSMState.STATE3);
 				break;
 			default:
 				throw new IllegalStateException("Invalid state: " + getCurrentState().toString());
 		}
-		nextState();
-	}
-
-	/* ======================== Private methods ======================== */
-	/**
-	 * Checks if the current auto state is finished and if so, transitions to the
-	 * next state to be executed.
-	 */
-	private void nextState() {
 		if (isCurrentStateFinished) {
 			currentStateIndex++;
-			isCurrentStateFinished = false;
 		}
 	}
 }
