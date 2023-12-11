@@ -8,6 +8,7 @@ import com.revrobotics.CANSparkMax;
 // Robot Imports
 import frc.robot.TeleopInput;
 import frc.robot.HardwareMap;
+import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
 
 public class FSMSystem {
 	/* ======================== Constants ======================== */
@@ -63,6 +64,7 @@ public class FSMSystem {
 		// Call one tick of update to ensure outputs reflect start state
 		update(null);
 	}
+
 	/**
 	 * Update FSM based on new inputs. This function only calls the FSM state
 	 * specific handlers.
@@ -83,6 +85,24 @@ public class FSMSystem {
 				throw new IllegalStateException("Invalid state: " + currentState.toString());
 		}
 		currentState = nextState(input);
+	}
+
+	/**
+	 * Performs specific action based on the autoState passed in.
+	 * @param autoState autoState that the subsystem executes.
+	 * @return if the action carried out in this state has finished executing
+	 */
+	public boolean updateAutonomous(AutoFSMState autoState) {
+		switch (autoState) {
+			case STATE1:
+				return handleAutoState1();
+			case STATE2:
+				return handleAutoState2();
+			case STATE3:
+				return handleAutoState3();
+			default:
+				return true;
+		}
 	}
 
 	/* ======================== Private methods ======================== */
@@ -128,5 +148,29 @@ public class FSMSystem {
 	 */
 	private void handleOtherState(TeleopInput input) {
 		exampleMotor.set(MOTOR_RUN_POWER);
+	}
+
+	/**
+	 * Performs action for auto STATE1.
+	 * @return if the action carried out has finished executing
+	 */
+	private boolean handleAutoState1() {
+		return true;
+	}
+
+	/**
+	 * Performs action for auto STATE2.
+	 * @return if the action carried out has finished executing
+	 */
+	private boolean handleAutoState2() {
+		return true;
+	}
+
+	/**
+	 * Performs action for auto STATE3.
+	 * @return if the action carried out has finished executing
+	 */
+	private boolean handleAutoState3() {
+		return true;
 	}
 }

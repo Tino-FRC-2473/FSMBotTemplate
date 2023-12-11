@@ -8,6 +8,8 @@ import edu.wpi.first.wpilibj.TimedRobot;
 
 // Systems
 import frc.robot.systems.FSMSystem;
+import frc.robot.systems.AutoHandlerSystem;
+import frc.robot.systems.AutoHandlerSystem.AutoPath;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -17,7 +19,11 @@ public class Robot extends TimedRobot {
 	private TeleopInput input;
 
 	// Systems
-	private FSMSystem fsmSystem;
+	private FSMSystem subSystem1;
+	private FSMSystem subSystem2;
+	private FSMSystem subSystem3;
+
+	private AutoHandlerSystem autoHandler;
 
 	/**
 	 * This function is run when the robot is first started up and should be used for any
@@ -29,29 +35,36 @@ public class Robot extends TimedRobot {
 		input = new TeleopInput();
 
 		// Instantiate all systems here
-		fsmSystem = new FSMSystem();
+		subSystem1 = new FSMSystem();
+		subSystem2 = new FSMSystem();
+		subSystem3 = new FSMSystem();
+		autoHandler = new AutoHandlerSystem(subSystem1, subSystem2, subSystem3);
 	}
 
 	@Override
 	public void autonomousInit() {
 		System.out.println("-------- Autonomous Init --------");
-		fsmSystem.reset();
+		autoHandler.reset(AutoPath.PATH1);
 	}
 
 	@Override
 	public void autonomousPeriodic() {
-		fsmSystem.update(null);
+		autoHandler.update();
 	}
 
 	@Override
 	public void teleopInit() {
 		System.out.println("-------- Teleop Init --------");
-		fsmSystem.reset();
+		subSystem1.reset();
+		subSystem2.reset();
+		subSystem3.reset();
 	}
 
 	@Override
 	public void teleopPeriodic() {
-		fsmSystem.update(input);
+		subSystem1.update(input);
+		subSystem2.update(input);
+		subSystem3.update(input);
 	}
 
 	@Override
