@@ -39,9 +39,9 @@ jobs:
     - name: Generate Javadoc with Gradle
       run: ./gradlew javadoc
     - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'build/docs/javadoc'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: 'build/docs/javadoc'
   deploy:
     needs: build
     runs-on: ubuntu-latest
