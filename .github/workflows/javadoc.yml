@@ -3,7 +3,7 @@ name: Javadoc
 on:
   # Only run for pushes to main branch
   push:
-    branches: ["main", "javadoc"]
+    branches: ["main"]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
