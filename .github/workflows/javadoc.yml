@@ -3,7 +3,7 @@ name: Gradle Build
 on:
   # Only run for pushes to main branch
   push:
-    branches: ["main"]
+    branches: ["main", "javadoc"]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
