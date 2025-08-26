@@ -1,7 +1,7 @@
 package frc.robot.motors;
 
 /**
- * An interface for any motor wrapper implementation for logging purposes
+ * An interface for any motor wrapper implementation for logging purposes.
  */
 public interface LoggedMotor {
 

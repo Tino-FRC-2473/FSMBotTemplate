@@ -13,11 +13,11 @@ import frc.robot.systems.FSMSystem;
 import frc.robot.systems.State;
 
 enum FSMStateSpace implements State<FSMStateSpace, ExampleFSMSystem> {
-	
+
 	START_STATE {
 		@Override
 		public void update(ExampleFSMSystem system, TeleopInput input) {
-			system.exampleMotor.set(0);
+			system.getExampleMotor().set(0);
 		}
 
 		@Override
@@ -28,7 +28,7 @@ enum FSMStateSpace implements State<FSMStateSpace, ExampleFSMSystem> {
 	OTHER_STATE {
 		@Override
 		public void update(ExampleFSMSystem system, TeleopInput input) {
-			system.exampleMotor.set(ExampleFSMSystem.MOTOR_RUN_POWER);
+			system.getExampleMotor().set(ExampleFSMSystem.MOTOR_RUN_POWER);
 		}
 
 		@Override
@@ -36,7 +36,7 @@ enum FSMStateSpace implements State<FSMStateSpace, ExampleFSMSystem> {
 			return START_STATE;
 		}
 	};
-	
+
 }
 
 public class ExampleFSMSystem extends FSMSystem<FSMStateSpace, ExampleFSMSystem> {
@@ -48,7 +48,11 @@ public class ExampleFSMSystem extends FSMSystem<FSMStateSpace, ExampleFSMSystem>
 
 	// Hardware devices should be owned by one and only one system. They must
 	// be private to their owner system and may not be used elsewhere.
-	SparkMax exampleMotor;
+	private SparkMax exampleMotor;
+
+	SparkMax getExampleMotor() {
+		return exampleMotor;
+	}
 
 	/* ======================== Constructor ======================== */
 	/**
@@ -70,7 +74,7 @@ public class ExampleFSMSystem extends FSMSystem<FSMStateSpace, ExampleFSMSystem>
 
 	@Override
 	public void reset() {
-		currentState = FSMStateSpace.START_STATE;
+		setCurrentState(FSMStateSpace.START_STATE);
 		update(null);
 	}
 

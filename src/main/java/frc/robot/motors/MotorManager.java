@@ -8,7 +8,7 @@ import org.littletonrobotics.junction.Logger;
 import frc.robot.Robot;
 
 /**
- * The motor manager that facilitates pooling and logging motor outputs
+ * The motor manager that facilitates pooling and logging motor outputs.
  */
 public class MotorManager {
 
@@ -20,7 +20,7 @@ public class MotorManager {
 	 */
 	public static void update() {
 		for (LoggedMotor motor : motorList) {
-			
+
 			// Update motor simulations
 			if (Robot.isSimulation()) {
 				motor.updateSimState();

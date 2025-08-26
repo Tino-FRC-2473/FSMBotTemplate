@@ -20,7 +20,7 @@ public class Robot extends TimedRobot {
 	private TeleopInput input;
 
 	// Systems
-	private FSMSystem<?,?> subSystem1;
+	private FSMSystem<?, ?> subSystem1;
 	private ExampleFSMSystem subSystem2;
 	private ExampleFSMSystem subSystem3;
 
