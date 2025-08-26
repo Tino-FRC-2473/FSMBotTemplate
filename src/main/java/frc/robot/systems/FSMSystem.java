@@ -18,8 +18,7 @@ import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
  * Your compiler / IDE will tell you what methods you need to implement
  * You should also have state handlers shown in the example
  */
-public abstract class FSMSystem<S> {
-
+public abstract class FSMSystem<S extends State<S, F>, F extends FSMSystem<S, F>> {
     /** 
      * the current state, defined as part of the provided statespace
      */
@@ -49,14 +48,20 @@ public abstract class FSMSystem<S> {
 	 * @param input Global TeleopInput if robot in teleop mode or null if
 	 *        the robot is in autonomous mode.
 	 */
-    public abstract void update(TeleopInput input);
+    public void update(TeleopInput input) {
+        currentState.update(self(), input);
+        currentState = nextState(input);
+    }
 
     /**
 	 * Performs specific action based on the autoState passed in.
+     * This should be overridden if the child doesn't use commands for autonomous
 	 * @param autoState autoState that the subsystem executes.
 	 * @return if the action carried out in this state has finished executing
 	 */
-    public abstract boolean updateAutonomous(AutoFSMState autoState);
+    public boolean updateAutonomous(AutoFSMState autoState) {
+        return true;
+    }
 
     /**
 	 * Decide the next state to transition to. This is a function of the inputs
@@ -67,6 +72,16 @@ public abstract class FSMSystem<S> {
 	 *        the robot is in autonomous mode.
 	 * @return FSM state for the next iteration
 	 */
-    protected abstract S nextState(TeleopInput input);
+    protected S nextState(TeleopInput input) {
+        return currentState.nextState(self(), input);
+    }
     
+    /**
+     * Returns this as the child
+     * @return this as the child
+     */
+    @SuppressWarnings("unchecked")
+    protected F self() {
+        return (F) this;
+    }
 }

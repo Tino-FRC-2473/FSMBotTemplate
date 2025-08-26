@@ -5,14 +5,12 @@ package frc.robot;
 
 // WPILib Imports
 import edu.wpi.first.wpilibj.TimedRobot;
-
-// Systems
-import frc.robot.systems.ExampleFSMSystem;
 import frc.robot.systems.FSMSystem;
 import frc.robot.systems.UselessFSMSystem;
 import frc.robot.motors.MotorManager;
 import frc.robot.systems.AutoHandlerSystem;
 import frc.robot.systems.AutoHandlerSystem.AutoPath;
+import frc.robot.systems.example.ExampleFSMSystem;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -22,7 +20,7 @@ public class Robot extends TimedRobot {
 	private TeleopInput input;
 
 	// Systems
-	private FSMSystem<?> subSystem1;
+	private FSMSystem<?,?> subSystem1;
 	private ExampleFSMSystem subSystem2;
 	private ExampleFSMSystem subSystem3;
 
