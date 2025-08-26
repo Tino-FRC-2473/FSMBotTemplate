@@ -47,10 +47,10 @@ public class ExampleFSMSystem extends FSMSystem<FSMState> {
 
 	// overridden methods don't require javadocs
 	// however, you may want to add implementation specific javadocs
-	
+
 	@Override
 	public void reset() {
-		currentState = FSMState.START_STATE;
+		setCurrentState(FSMState.START_STATE);
 
 		// Call one tick of update to ensure outputs reflect start state
 		update(null);
@@ -58,7 +58,7 @@ public class ExampleFSMSystem extends FSMSystem<FSMState> {
 
 	@Override
 	public void update(TeleopInput input) {
-		switch (currentState) {
+		switch (getCurrentState()) {
 			case START_STATE:
 				handleStartState(input);
 				break;
@@ -68,9 +68,9 @@ public class ExampleFSMSystem extends FSMSystem<FSMState> {
 				break;
 
 			default:
-				throw new IllegalStateException("Invalid state: " + currentState.toString());
+				throw new IllegalStateException("Invalid state: " + getCurrentState().toString());
 		}
-		currentState = nextState(input);
+		setCurrentState(nextState(input));
 	}
 
 	@Override
@@ -91,7 +91,7 @@ public class ExampleFSMSystem extends FSMSystem<FSMState> {
 
 	@Override
 	protected FSMState nextState(TeleopInput input) {
-		switch (currentState) {
+		switch (getCurrentState()) {
 			case START_STATE:
 				if (input != null) {
 					return FSMState.OTHER_STATE;
@@ -103,7 +103,7 @@ public class ExampleFSMSystem extends FSMSystem<FSMState> {
 				return FSMState.OTHER_STATE;
 
 			default:
-				throw new IllegalStateException("Invalid state: " + currentState.toString());
+				throw new IllegalStateException("Invalid state: " + getCurrentState().toString());
 		}
 	}
 

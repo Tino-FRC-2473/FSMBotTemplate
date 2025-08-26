@@ -10,10 +10,9 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.Robot;
 
 /**
- * TalonFx wrapper class, using DC motor sim + sim states
+ * TalonFx wrapper class, using DC motor sim + sim states.
  */
 public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 

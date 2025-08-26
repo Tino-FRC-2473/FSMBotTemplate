@@ -8,7 +8,7 @@ import edu.wpi.first.wpilibj.RobotController;
 import frc.robot.Robot;
 
 /**
- * Spark max wrapper class, using SparkMaxSim
+ * Spark max wrapper class, using SparkMaxSim.
  */
 public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 
