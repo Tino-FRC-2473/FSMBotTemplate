@@ -7,7 +7,10 @@ package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;
 
 // Systems
+import frc.robot.systems.ExampleFSMSystem;
 import frc.robot.systems.FSMSystem;
+import frc.robot.systems.UselessFSMSystem;
+import frc.robot.motors.MotorManager;
 import frc.robot.systems.AutoHandlerSystem;
 import frc.robot.systems.AutoHandlerSystem.AutoPath;
 
@@ -19,9 +22,9 @@ public class Robot extends TimedRobot {
 	private TeleopInput input;
 
 	// Systems
-	private FSMSystem subSystem1;
-	private FSMSystem subSystem2;
-	private FSMSystem subSystem3;
+	private FSMSystem<?> subSystem1;
+	private ExampleFSMSystem subSystem2;
+	private ExampleFSMSystem subSystem3;
 
 	private AutoHandlerSystem autoHandler;
 
@@ -35,10 +38,19 @@ public class Robot extends TimedRobot {
 		input = new TeleopInput();
 
 		// Instantiate all systems here
-		subSystem1 = new FSMSystem();
-		subSystem2 = new FSMSystem();
-		subSystem3 = new FSMSystem();
-		autoHandler = new AutoHandlerSystem(subSystem1, subSystem2, subSystem3);
+		subSystem2 = new ExampleFSMSystem();
+		subSystem3 = new ExampleFSMSystem();
+
+		// you can swap out FSM systems if neccesary
+		// this may be needed if you want different behavior in sim
+		// do not instantiate something that would try to use hardware you don't have
+		if (HardwareMap.isExampleFSMEnabled()) {
+			subSystem1 = new ExampleFSMSystem();
+		} else {
+			subSystem1 = new UselessFSMSystem();
+		}
+
+		autoHandler = new AutoHandlerSystem((ExampleFSMSystem) subSystem1, subSystem2, subSystem3);
 	}
 
 	@Override
@@ -50,6 +62,9 @@ public class Robot extends TimedRobot {
 	@Override
 	public void autonomousPeriodic() {
 		autoHandler.update();
+
+		// logs motor values
+		MotorManager.update();
 	}
 
 	@Override
@@ -65,6 +80,9 @@ public class Robot extends TimedRobot {
 		subSystem1.update(input);
 		subSystem2.update(input);
 		subSystem3.update(input);
+
+		// logs motor values
+		MotorManager.update();
 	}
 
 	@Override
@@ -94,7 +112,9 @@ public class Robot extends TimedRobot {
 	}
 
 	@Override
-	public void simulationPeriodic() { }
+	public void simulationPeriodic() {
+
+	}
 
 	// Do not use robotPeriodic. Use mode specific periodic methods instead.
 	@Override

@@ -28,4 +28,12 @@ public final class HardwareMap {
 	public static boolean isTestBoard() {
 		return !HardwareMap.testBoardPin.get();
 	}
+
+	/**
+	 * Hardware map entry for the example FSM
+	 * @return if the hardware for the example FSM is present
+	 */
+	public static boolean isExampleFSMEnabled() {
+		return true;
+	}
 }

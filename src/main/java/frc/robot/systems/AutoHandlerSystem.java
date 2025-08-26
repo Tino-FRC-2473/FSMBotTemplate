@@ -22,9 +22,9 @@ public class AutoHandlerSystem {
 	private int currentStateIndex;
 
 	//FSM Systems that the autoHandlerFSM uses
-	private FSMSystem subsystem1;
-	private FSMSystem subsystem2;
-	private FSMSystem subsystem3;
+	private ExampleFSMSystem subsystem1;
+	private ExampleFSMSystem subsystem2;
+	private ExampleFSMSystem subsystem3;
 
 	//Predefined auto paths
 	private static final AutoFSMState[] PATH1 = new AutoFSMState[]{
@@ -43,7 +43,7 @@ public class AutoHandlerSystem {
 	 * @param fsm2 the second subsystem that the auto handler will call functions on
 	 * @param fsm3 the third subsystem that the auto handler will call functions on
 	 */
-	public AutoHandlerSystem(FSMSystem fsm1, FSMSystem fsm2, FSMSystem fsm3) {
+	public AutoHandlerSystem(ExampleFSMSystem fsm1, ExampleFSMSystem fsm2, ExampleFSMSystem fsm3) {
 		subsystem1 = fsm1;
 		subsystem2 = fsm2;
 		subsystem3 = fsm3;
