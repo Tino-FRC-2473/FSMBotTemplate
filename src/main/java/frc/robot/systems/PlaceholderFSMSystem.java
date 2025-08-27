@@ -10,7 +10,7 @@ enum IdentityStateSpace {
 /**
  * this is intended to be used in place of an FSM when the hardware is not present.
  */
-public class UselessFSMSystem extends FSMSystem<IdentityStateSpace> {
+public class PlaceholderFSMSystem extends FSMSystem<IdentityStateSpace> {
 
 	@Override
 	public void reset() {

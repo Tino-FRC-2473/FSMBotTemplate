@@ -1,6 +1,6 @@
 package frc.robot.motors;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.littletonrobotics.junction.Logger;
@@ -13,7 +13,7 @@ import frc.robot.Robot;
 public class MotorManager {
 
 	/** A global list containing all logged motors. */
-	private static List<LoggedMotor> motorList = new LinkedList<>();
+	private static List<LoggedMotor> motorList = new ArrayList<>();
 
 	/**
 	 * Updates all motors in the global list and logs information to Ascope.
@@ -35,6 +35,8 @@ public class MotorManager {
 					+ " Setpoint", motor.getLoggedSetpoint());
 			Logger.recordOutput("Motor" + motor.getIdentifier()
 					+ " Voltage", motor.getLoggedVoltage());
+			Logger.recordOutput("Motor" + motor.getIdentifier()
+					+ " Current", motor.getLoggedCurrent());
 		}
 	}
 

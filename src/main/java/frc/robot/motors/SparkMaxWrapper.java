@@ -13,7 +13,7 @@ import frc.robot.Robot;
 public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 
 	// Components
-	private final DCMotor motorType;
+	private final DCMotor gearbox;
 	private final SparkMaxSim motorSim;
 
 	public static final double LOOP_PERIOD_MS = 0.020;
@@ -31,8 +31,8 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 		init();
 
 		// Create sim instance
-		motorType = DCMotor.getNEO(1);
-		motorSim = new SparkMaxSim(this, motorType);
+		gearbox = DCMotor.getNEO(1);
+		motorSim = new SparkMaxSim(this, gearbox);
 	}
 
 	/**
@@ -47,8 +47,8 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 		init();
 
 		// Create sim instance
-		motorType = dcMotor;
-		motorSim = new SparkMaxSim(this, motorType);
+		gearbox = dcMotor;
+		motorSim = new SparkMaxSim(this, gearbox);
 	}
 
 	@Override
@@ -63,7 +63,7 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 		super.set(speed);
 
 		// Add speed to buffer for sim
-		this.targetVelocity = speed * motorType.freeSpeedRadPerSec;
+		this.targetVelocity = speed * gearbox.freeSpeedRadPerSec;
 	}
 
 	@Override
@@ -101,6 +101,11 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 	@Override
 	public double getLoggedVoltage() {
 		return motorSim.getBusVoltage();
+	}
+
+	@Override
+	public double getLoggedCurrent() {
+		return motorSim.getMotorCurrent();
 	}
 
 }

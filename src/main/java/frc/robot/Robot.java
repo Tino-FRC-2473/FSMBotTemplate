@@ -9,7 +9,7 @@ import edu.wpi.first.wpilibj.TimedRobot;
 // Systems
 import frc.robot.systems.ExampleFSMSystem;
 import frc.robot.systems.FSMSystem;
-import frc.robot.systems.UselessFSMSystem;
+import frc.robot.systems.PlaceholderFSMSystem;
 import frc.robot.motors.MotorManager;
 import frc.robot.systems.AutoHandlerSystem;
 import frc.robot.systems.AutoHandlerSystem.AutoPath;
@@ -47,7 +47,7 @@ public class Robot extends TimedRobot {
 		if (HardwareMap.isExampleFSMEnabled()) {
 			subSystem1 = new ExampleFSMSystem();
 		} else {
-			subSystem1 = new UselessFSMSystem();
+			subSystem1 = new PlaceholderFSMSystem();
 		}
 
 		autoHandler = new AutoHandlerSystem((ExampleFSMSystem) subSystem1, subSystem2, subSystem3);

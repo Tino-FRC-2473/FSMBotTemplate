@@ -43,9 +43,15 @@ public interface LoggedMotor {
 	double getLoggedSetpoint();
 
 	/**
-	 * a.
-	 * @return a
+	 * Gets the voltage of the motor in volts.
+	 * @return the voltage of the motor
 	 */
 	double getLoggedVoltage();
+
+	/**
+	 * Gets the current of the motor in amperes.
+	 * @return the current of the motor
+	 */
+	double getLoggedCurrent();
 
 }

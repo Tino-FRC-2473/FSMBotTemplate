@@ -1,4 +1,5 @@
 package frc.robot.motors;
+import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.RPM;
 import static edu.wpi.first.units.Units.Rotations;
 import static edu.wpi.first.units.Units.Volts;
@@ -21,7 +22,7 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 	private static final double INERTIA_CONSTANT = 0.001;
 
 	// Components
-	private final DCMotor kraken;
+	private final DCMotor gearbox;
 	// Sim model for calculations
 	// getSimState() acccesses the default sim
 	private final DCMotorSim motorSimModel;
@@ -66,14 +67,14 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 		init();
 
 		// Create sim instance
-		kraken = motorType;
+		gearbox = motorType;
 		motorSimModel = new DCMotorSim(
 			LinearSystemId.createDCMotorSystem(
-				kraken,
+				gearbox,
 				INERTIA_CONSTANT,
 				K_GEAR_RATIO
 			),
-			kraken
+			gearbox
 		);
 	}
 
@@ -122,6 +123,11 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 	@Override
 	public double getLoggedVoltage() {
 		return getMotorVoltage().getValue().in(Volts);
+	}
+
+	@Override
+	public double getLoggedCurrent() {
+		return getSupplyCurrent().getValue().in(Amps);
 	}
 
 	/**
