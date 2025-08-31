@@ -27,15 +27,16 @@ public class MotorManager {
 			}
 
 			// Log motor information
-			Logger.recordOutput("Motor " + motor.getIdentifier()
+			String prefix = Constants.LOGGING_PREFIX;
+			Logger.recordOutput(prefix + motor.getIdentifier()
 					+ " Rotations", motor.getLoggedPosition());
-			Logger.recordOutput("Motor " + motor.getIdentifier()
+			Logger.recordOutput(prefix + motor.getIdentifier()
 					+ " Velocity", motor.getLoggedVelocity());
-			Logger.recordOutput("Motor " + motor.getIdentifier()
+			Logger.recordOutput(prefix + motor.getIdentifier()
 					+ " Setpoint", motor.getLoggedSetpoint());
-			Logger.recordOutput("Motor" + motor.getIdentifier()
+			Logger.recordOutput(prefix + motor.getIdentifier()
 					+ " Voltage", motor.getLoggedVoltage());
-			Logger.recordOutput("Motor" + motor.getIdentifier()
+			Logger.recordOutput(prefix + motor.getIdentifier()
 					+ " Current", motor.getLoggedCurrent());
 		}
 	}

@@ -13,7 +13,7 @@ import frc.robot.Robot;
 public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 
 	// Components
-	private final DCMotor gearbox;
+	private final DCMotor configs;
 	private final SparkMaxSim motorSim;
 
 	public static final double LOOP_PERIOD_MS = 0.020;
@@ -30,25 +30,35 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 		super(deviceId, type);
 		init();
 
+		// only allow valid spark motors
+		if (!Constants.ALLOWED_MOTOR_TYPES.contains(type)) {
+			throw new IllegalArgumentException(
+				String.format(
+					"Invalid motor type %s not part of the allowed list in Constants.java",
+					type
+				)
+			);
+		}
+
 		// Create sim instance
-		gearbox = DCMotor.getNEO(1);
-		motorSim = new SparkMaxSim(this, gearbox);
+		configs = Constants.DEFAULT_SPARK_CONFIG;
+		motorSim = new SparkMaxSim(this, configs);
 	}
 
 	/**
 	 * Constructor for CAN ID, motor type and an instance of DCMotor.
 	 * @param deviceId the CAN ID of the motor
 	 * @param type the type of motor
-	 * @param dcMotor the instance of DCMotor to use for sim calculations
+	 * @param motorConfigs the instance of DCMotor to use for sim calculations
 	 */
-	public SparkMaxWrapper(int deviceId, MotorType type, DCMotor dcMotor) {
+	public SparkMaxWrapper(int deviceId, MotorType type, DCMotor motorConfigs) {
 		// Initialize motor
 		super(deviceId, type);
 		init();
 
 		// Create sim instance
-		gearbox = dcMotor;
-		motorSim = new SparkMaxSim(this, gearbox);
+		configs = motorConfigs;
+		motorSim = new SparkMaxSim(this, configs);
 	}
 
 	@Override
@@ -63,7 +73,7 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 		super.set(speed);
 
 		// Add speed to buffer for sim
-		this.targetVelocity = speed * gearbox.freeSpeedRadPerSec;
+		this.targetVelocity = speed * configs.freeSpeedRadPerSec;
 	}
 
 	@Override

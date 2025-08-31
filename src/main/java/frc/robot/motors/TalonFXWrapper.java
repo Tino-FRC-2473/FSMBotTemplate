@@ -22,7 +22,7 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 	private static final double INERTIA_CONSTANT = 0.001;
 
 	// Components
-	private final DCMotor gearbox;
+	private final DCMotor configs;
 	// Sim model for calculations
 	// getSimState() acccesses the default sim
 	private final DCMotorSim motorSimModel;
@@ -34,16 +34,16 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 	 * @param deviceId the CAN ID of the motor
 	 */
 	public TalonFXWrapper(int deviceId) {
-		this(deviceId, DCMotor.getKrakenX60(1));
+		this(deviceId, Constants.DEFAULT_TALONFX_CONFIG);
 	}
 
 	/**
 	 * Constructor with device ID and motor type.
 	 * @param deviceId the CAN ID of the motor
-	 * @param motorType the motor type
+	 * @param motorConfigs the motor type
 	 */
-	public TalonFXWrapper(int deviceId, DCMotor motorType) {
-		this(deviceId, "", motorType);
+	public TalonFXWrapper(int deviceId, DCMotor motorConfigs) {
+		this(deviceId, "", motorConfigs);
 	}
 
 	/**
@@ -59,22 +59,22 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 	 * Constructor with device ID, CAN bus string, and motor type.
 	 * @param deviceId the CAN ID of the motor
 	 * @param canbus the string form of the canbus
-	 * @param motorType the motor type
+	 * @param motorConfigs the motor type
 	 */
-	public TalonFXWrapper(int deviceId, String canbus, DCMotor motorType) {
+	public TalonFXWrapper(int deviceId, String canbus, DCMotor motorConfigs) {
 		// Initialize motor
 		super(deviceId, canbus);
 		init();
 
 		// Create sim instance
-		gearbox = motorType;
+		configs = motorConfigs;
 		motorSimModel = new DCMotorSim(
 			LinearSystemId.createDCMotorSystem(
-				gearbox,
+				configs,
 				INERTIA_CONSTANT,
 				K_GEAR_RATIO
 			),
-			gearbox
+			configs
 		);
 	}
 
