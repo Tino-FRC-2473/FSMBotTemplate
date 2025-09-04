@@ -30,18 +30,14 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 		super(deviceId, type);
 		init();
 
-		// only allow valid spark motors
-		if (!Constants.ALLOWED_MOTOR_TYPES.contains(type)) {
-			throw new IllegalArgumentException(
-				String.format(
-					"Invalid motor type %s not part of the allowed list in Constants.java",
-					type
-				)
-			);
+		// only allow brushless motors
+		// this can be safely removed if neccesary
+		if (type != MotorType.kBrushless) {
+			throw new IllegalArgumentException("Only brushless motors are supported");
 		}
 
 		// Create sim instance
-		configs = Constants.DEFAULT_SPARK_CONFIG;
+		configs = MotorConstants.DEFAULT_SPARK_CONFIG;
 		motorSim = new SparkMaxSim(this, configs);
 	}
 

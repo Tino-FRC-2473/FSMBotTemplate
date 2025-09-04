@@ -34,7 +34,7 @@ public class TalonFXWrapper extends TalonFX implements LoggedMotor {
 	 * @param deviceId the CAN ID of the motor
 	 */
 	public TalonFXWrapper(int deviceId) {
-		this(deviceId, Constants.DEFAULT_TALONFX_CONFIG);
+		this(deviceId, MotorConstants.DEFAULT_TALONFX_CONFIG);
 	}
 
 	/**

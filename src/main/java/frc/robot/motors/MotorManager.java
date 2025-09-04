@@ -27,7 +27,7 @@ public class MotorManager {
 			}
 
 			// Log motor information
-			String prefix = Constants.LOGGING_PREFIX;
+			String prefix = MotorConstants.LOGGING_PREFIX;
 			Logger.recordOutput(prefix + motor.getIdentifier()
 					+ " Rotations", motor.getLoggedPosition());
 			Logger.recordOutput(prefix + motor.getIdentifier()
