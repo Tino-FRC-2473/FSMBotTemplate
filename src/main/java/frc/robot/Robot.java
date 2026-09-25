@@ -3,120 +3,207 @@
 // the WPILib BSD license file in the root directory of this project.
 package frc.robot;
 
-// WPILib Imports
+import edu.wpi.first.units.Units;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.TimedRobot;
-
-// Systems
-import frc.robot.systems.ExampleFSMSystem;
-import frc.robot.systems.FSMSystem;
-import frc.robot.systems.PlaceholderFSMSystem;
-import frc.robot.motors.MotorManager;
-import frc.robot.systems.AutoHandlerSystem;
-import frc.robot.systems.AutoHandlerSystem.AutoPath;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import java.util.Objects;
+import java.util.function.Supplier;
+import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.CommandSwerveDrivetrain;
+import frc.robot.systems.DrivetrainFSMSystem;
+import frc.robot.systems.VisionFSMSystem;
 
 /**
- * The VM is configured to automatically run this class, and to call the functions corresponding to
- * each mode, as described in the TimedRobot documentation.
+ * Robot lifecycle for the Phoenix Tuner X swerve wrapper, Xbox teleop, and optional Limelight.
+ * Replacing {@code frc.robot.generated.TunerConstants} with the unmodified robot-specific
+ * Phoenix Tuner X output is the only hardware-specific integration step.
  */
 public class Robot extends TimedRobot {
 	private TeleopInput input;
+	private final Field2d simulationField = new Field2d();
 
-	// Systems
-	private FSMSystem<?> subSystem1;
-	private ExampleFSMSystem subSystem2;
-	private ExampleFSMSystem subSystem3;
+	private CommandSwerveDrivetrain drivetrain;
+	private DrivetrainFSMSystem drivetrainFSM;
+	private VisionFSMSystem visionFSM;
 
-	private AutoHandlerSystem autoHandler;
-
-	/**
-	 * This function is run when the robot is first started up and should be used for any
-	 * initialization code.
-	 */
 	@Override
 	public void robotInit() {
-		System.out.println("robotInit");
 		input = new TeleopInput();
+		SmartDashboard.putData("Field", simulationField);
+		initializeFromTunerConstants();
+	}
 
-		// Instantiate all systems here
-		subSystem2 = new ExampleFSMSystem();
-		subSystem3 = new ExampleFSMSystem();
+	private void initializeFromTunerConstants() {
+		CommandSwerveDrivetrain initializedDrivetrain = null;
+		try {
+			initializedDrivetrain = TunerConstants.createDrivetrain();
+			DrivetrainFSMSystem.Config driveConfig = DrivetrainFSMSystem.configFromGeometry(
+				TunerConstants.kSpeedAt12Volts.in(Units.MetersPerSecond),
+				Constants.RobotIntegration.MAX_LINEAR_SPEED_SCALE,
+				initializedDrivetrain.getMaximumModuleRadiusMeters(),
+				Constants.RobotIntegration.DRIVER_DEADBAND);
 
-		// you can swap out FSM systems if neccesary
-		// this may be needed if you want different behavior in sim
-		// do not instantiate something that would try to use hardware you don't have
-		if (HardwareMap.isExampleFSMEnabled()) {
-			subSystem1 = new ExampleFSMSystem();
-		} else {
-			subSystem1 = new PlaceholderFSMSystem();
+			drivetrain = initializedDrivetrain;
+			drivetrainFSM = new DrivetrainFSMSystem(
+				drivetrain,
+				driveConfig,
+				DrivetrainFSMSystem::mapXboxInput);
+		} catch (RuntimeException error) {
+			drivetrainFSM = null;
+			visionFSM = null;
+			drivetrain = null;
+			if (initializedDrivetrain != null) {
+				try {
+					initializedDrivetrain.close();
+				} catch (RuntimeException closeError) {
+					error.addSuppressed(closeError);
+				}
+			}
+			reportInitializationFailure(
+				"Swerve drivetrain was not initialized. Replace the TunerConstants scaffold "
+					+ "with this robot's unmodified 2026 Phoenix Tuner X output and verify its generated "
+					+ "speed and module geometry. Details: " + error);
+			return;
 		}
 
-		autoHandler = new AutoHandlerSystem((ExampleFSMSystem) subSystem1, subSystem2, subSystem3);
+		try {
+			visionFSM = createVisionIfEnabled(
+				Constants.RobotIntegration.ENABLE_LIMELIGHT_VISION,
+				() -> new VisionFSMSystem(drivetrain, getVisionConfig()));
+		} catch (RuntimeException error) {
+			visionFSM = null;
+			reportOptionalVisionFailure(
+				"Limelight vision was not initialized; drivetrain remains available. Details: " + error);
+		}
+	}
+
+	/** Lazily create the camera integration so the disabled path has no NetworkTables side effects. */
+	static VisionFSMSystem createVisionIfEnabled(
+		boolean enabled,
+		Supplier<VisionFSMSystem> visionFactory) {
+		Objects.requireNonNull(visionFactory, "visionFactory");
+		return enabled ? Objects.requireNonNull(visionFactory.get(), "visionFactory result") : null;
+	}
+
+	private void reportInitializationFailure(String message) {
+		if (RobotBase.isReal()) {
+			DriverStation.reportError(message, false);
+		} else {
+			DriverStation.reportWarning(message, false);
+		}
+	}
+
+	private void reportOptionalVisionFailure(String message) {
+		if (RobotBase.isReal()) {
+			DriverStation.reportError(message, false);
+		} else {
+			DriverStation.reportWarning(message, false);
+		}
+	}
+
+	/** Camera settings used only when {@link Constants.RobotIntegration#ENABLE_LIMELIGHT_VISION} is true. */
+	protected VisionFSMSystem.Config getVisionConfig() {
+		// Defaults assume the camera mounting transform is configured in Limelight Web UI.
+		return VisionFSMSystem.Config.defaults(
+			Constants.RobotIntegration.LIMELIGHT_NAME,
+			Constants.RobotIntegration.APRILTAG_PIPELINE);
 	}
 
 	@Override
 	public void autonomousInit() {
-		System.out.println("-------- Autonomous Init --------");
-		autoHandler.reset(AutoPath.PATH1);
+		if (drivetrainFSM != null) {
+			drivetrainFSM.reset();
+		}
+		if (visionFSM != null) {
+			visionFSM.reset();
+		}
 	}
 
 	@Override
 	public void autonomousPeriodic() {
-		autoHandler.update();
-
-		// logs motor values
-		MotorManager.update();
+		if (drivetrainFSM != null) {
+			drivetrainFSM.update(null);
+		}
+		if (visionFSM != null) {
+			visionFSM.updateVision();
+		}
 	}
 
 	@Override
 	public void teleopInit() {
-		System.out.println("-------- Teleop Init --------");
-		subSystem1.reset();
-		subSystem2.reset();
-		subSystem3.reset();
+		if (drivetrainFSM != null) {
+			drivetrainFSM.reset();
+		}
+		if (visionFSM != null) {
+			visionFSM.reset();
+		}
 	}
 
 	@Override
 	public void teleopPeriodic() {
-		subSystem1.update(input);
-		subSystem2.update(input);
-		subSystem3.update(input);
-
-		// logs motor values
-		MotorManager.update();
+		if (drivetrain != null && input.isFieldCentricResetPressed()) {
+			drivetrain.seedFieldCentric();
+		}
+		if (visionFSM != null) {
+			visionFSM.update(input);
+		}
+		if (drivetrainFSM != null) {
+			drivetrainFSM.update(input);
+		}
 	}
 
 	@Override
 	public void disabledInit() {
-		System.out.println("-------- Disabled Init --------");
+		if (drivetrainFSM != null) {
+			drivetrainFSM.update(null);
+		}
 	}
 
 	@Override
 	public void disabledPeriodic() {
-
+		if (drivetrainFSM != null) {
+			drivetrainFSM.update(null);
+		}
+		if (visionFSM != null) {
+			visionFSM.updateVision();
+		}
 	}
 
 	@Override
 	public void testInit() {
-		System.out.println("-------- Test Init --------");
+		if (drivetrainFSM != null) {
+			drivetrainFSM.reset();
+		}
+		if (visionFSM != null) {
+			visionFSM.reset();
+		}
 	}
 
 	@Override
 	public void testPeriodic() {
-
-	}
-
-	/* Simulation mode handlers, only used for simulation testing  */
-	@Override
-	public void simulationInit() {
-		System.out.println("-------- Simulation Init --------");
+		if (drivetrainFSM != null) {
+			drivetrainFSM.update(null);
+		}
+		if (visionFSM != null) {
+			visionFSM.updateVision();
+		}
 	}
 
 	@Override
 	public void simulationPeriodic() {
-
+		if (drivetrain != null) {
+			simulationField.setRobotPose(drivetrain.getPose());
+		}
 	}
 
-	// Do not use robotPeriodic. Use mode specific periodic methods instead.
 	@Override
-	public void robotPeriodic() { }
+	public void close() {
+		if (drivetrain != null) {
+			drivetrain.close();
+		}
+		super.close();
+	}
 }
