@@ -14,12 +14,11 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.Constants.VisionDefaults;
-import frc.robot.TeleopInput;
+import frc.robot.input.Input;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.imported.LimelightHelpers;
 import frc.robot.imported.LimelightHelpers.PoseEstimate;
 import frc.robot.imported.LimelightHelpers.RawFiducial;
-import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
 
 /**
  * Generic Limelight MegaTag2 localization FSM. Camera name, pipeline, mounting transform,
@@ -165,18 +164,12 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	}
 
 	@Override
-	public void update(TeleopInput input) {
+	public void update(Input input) {
 		updateVision();
 	}
 
 	@Override
-	public boolean updateAutonomous(AutoFSMState autoState) {
-		updateVision();
-		return true;
-	}
-
-	@Override
-	protected VisionState nextState(TeleopInput input) {
+	protected VisionState nextState(Input input) {
 		return getCurrentState();
 	}
 

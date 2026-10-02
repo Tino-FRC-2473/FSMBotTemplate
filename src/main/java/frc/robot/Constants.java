@@ -15,6 +15,8 @@ public final class Constants {
 
 		/** Driver Station USB port for the Xbox controller. */
 		public static final int DRIVER_CONTROLLER_PORT = 0;
+		/** Driver Station USB port for the mechanism Xbox controller. */
+		public static final int MECHANISM_CONTROLLER_PORT = 1;
 		/** Per-axis normalized stick deadband. */
 		public static final double DRIVER_DEADBAND = 0.08;
 		/** Fraction of the Phoenix Tuner X measured free speed to allow (1.0 = full speed). */
@@ -24,6 +26,15 @@ public final class Constants {
 		public static final boolean ENABLE_LIMELIGHT_VISION = false;
 		public static final String LIMELIGHT_NAME = "limelight";
 		public static final int APRILTAG_PIPELINE = 0;
+	}
+
+	/** Initial PathPlanner feedback gains; tune at low speed on the actual robot. */
+	public static final class Autonomous {
+		private Autonomous() { }
+
+		public static final double TRANSLATION_KP = 5.0;
+		public static final double ROTATION_KP = 5.0;
+		public static final double TIMEOUT_SECONDS = 15.0;
 	}
 
 	/** Generic localization-quality defaults; field bounds are intentionally optional. */

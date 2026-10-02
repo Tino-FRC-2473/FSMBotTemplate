@@ -1,81 +1,68 @@
 package frc.robot.systems;
 
-import frc.robot.TeleopInput;
-import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
+import java.util.Objects;
+
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.Subsystem;
+import frc.robot.input.Input;
 
 /**
- * This is a superclass for FSMs with NECCESARY methods to implement
- *
- * Start implementing an FSM by writing this in a new java file:
- *
- * enum FSMState {
- *	  // add states here
- * }
- * public class _______ extends FSMSystem<FSMState> {
- *	  ...
- * }
- *
- * Your compiler / IDE will tell you what methods you need to implement
- * You should also have state handlers shown in the example
- * @param <S> the type of state
+ * Manually updated state machine shared by teleop and autonomous.
+ * Implementing Subsystem supplies command requirements, not an automatic update loop.
+ * @param <S> the mechanism's state type
  */
-public abstract class FSMSystem<S> {
-
-	/**
-	 * the current state, defined as part of the provided statespace.
-	 */
+public abstract class FSMSystem<S> implements Subsystem {
 	private S currentState;
 
-	/**
-	 * Return current FSM state.
-	 * @return Current FSM state
-	 */
+	/** Return the current state. */
 	public S getCurrentState() {
 		return currentState;
 	}
 
 	/**
-	 * Sets the current state.
-	 * @param newState the new state
+	 * Directly replace the state without guards or goal translation. Normal transitions remain
+	 * enabled; outputs change on the next regular update, not inside this setter.
+	 * @param state state to enter, including reentering the current state
 	 */
-	protected void setCurrentState(S newState) {
-		currentState = newState;
+	public void setState(S state) {
+		currentState = Objects.requireNonNull(state, "state");
+	}
+
+	/** Internal-transition convenience using the same public setter. */
+	public void setCurrentState(S newState) {
+		setState(newState);
 	}
 
 	/**
-	 * Reset this system to its start state. This may be called from mode init
-	 * when the robot is enabled.
-	 *
-	 * Note this is distinct from the one-time initialization in the constructor
-	 * as it may be called multiple times in a boot cycle,
-	 * Ex. if the robot is enabled, disabled, then reenabled.
+	 * Create a command that sets state once on initialization and finishes immediately.
+	 * It requires this FSM, but does not tick it, hold its state, or wait for physical completion.
+	 * @param state state to assign when the command runs
+	 * @return a reusable one-shot command suitable for PathPlanner NamedCommands
+	 */
+	public Command setStateCommand(S state) {
+		Objects.requireNonNull(state, "state");
+		return Commands.runOnce(() -> setState(state), this);
+	}
+
+	/**
+	 * Immediately restore safe state AND safe outputs, even when no update follows.
+	 * Called before autonomous and on completion, cancellation, disable, and mode changes.
 	 */
 	public abstract void reset();
 
 	/**
-	 * Update FSM based on new inputs. This function only calls the FSM state
-	 * specific handlers.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *		the robot is in autonomous mode.
+	 * Apply state outputs and advance normal transitions once per enabled loop.
+	 * Null input means no controller input, not "stop": sensor/timer transitions still run.
+	 * @param input teleop controller input, or null during autonomous
 	 */
-	public abstract void update(TeleopInput input);
+	public abstract void update(Input input);
 
 	/**
-	 * Performs specific action based on the autoState passed in.
-	 * @param autoState autoState that the subsystem executes.
-	 * @return if the action carried out in this state has finished executing
+	 * Read-only transition decision. Controller-driven changes must check for non-null input;
+	 * sensor/timer-driven changes can operate in either mode.
+	 * @param input teleop controller input, or null during autonomous
+	 * @return state for the next update
 	 */
-	public abstract boolean updateAutonomous(AutoFSMState autoState);
-
-	/**
-	 * Decide the next state to transition to. This is a function of the inputs
-	 * and the current state of this FSM. This method should not have any side
-	 * effects on outputs. In other words, this method should only read or get
-	 * values to decide what state to go to.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *		the robot is in autonomous mode.
-	 * @return FSM state for the next iteration
-	 */
-	protected abstract S nextState(TeleopInput input);
-
+	protected abstract S nextState(Input input);
 }

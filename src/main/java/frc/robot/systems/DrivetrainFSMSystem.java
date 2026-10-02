@@ -4,10 +4,9 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import edu.wpi.first.math.MathUtil;
-import frc.robot.TeleopInput;
-import frc.robot.TeleopInput.DriveAxes;
+import frc.robot.input.Input;
+import frc.robot.input.InputTypes.AxialInput;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
-import frc.robot.systems.AutoHandlerSystem.AutoFSMState;
 
 /**
  * Generic manually ticked field-centric swerve FSM. Driver axes are normalized in the input
@@ -24,9 +23,9 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 
 	/** Converts operator input to normalized chassis demand. */
 	@FunctionalInterface
-	public interface InputMapper extends Function<TeleopInput, DriveInput> {
+	public interface InputMapper extends Function<Input, DriveInput> {
 		@Override
-		DriveInput apply(TeleopInput input);
+		DriveInput apply(Input input);
 	}
 
 	/** Validated robot-provided drive limits and input deadband. */
@@ -38,7 +37,8 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 			if (!Double.isFinite(maxLinearSpeedMetersPerSecond) || maxLinearSpeedMetersPerSecond <= 0.0) {
 				throw new IllegalArgumentException("Maximum linear speed must be finite and positive");
 			}
-			if (!Double.isFinite(maxAngularSpeedRadiansPerSecond) || maxAngularSpeedRadiansPerSecond <= 0.0) {
+			if (!Double.isFinite(maxAngularSpeedRadiansPerSecond)
+				|| maxAngularSpeedRadiansPerSecond <= 0.0) {
 				throw new IllegalArgumentException("Maximum angular speed must be finite and positive");
 			}
 			if (!Double.isFinite(deadband) || deadband < 0.0 || deadband >= 1.0) {
@@ -68,7 +68,7 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	}
 
 	@Override
-	public void update(TeleopInput input) {
+	public void update(Input input) {
 		drivetrain.updateOperatorPerspective();
 		if (input == null || !input.isDriverControllerConnected()) {
 			stop();
@@ -92,12 +92,13 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	}
 
 	/** Convenience mapper for the built-in Xbox input abstraction. */
-	public static DriveInput mapXboxInput(TeleopInput input) {
+	public static DriveInput mapXboxInput(Input input) {
 		if (input == null || !input.isDriverControllerConnected()) {
 			return new DriveInput(0.0, 0.0, 0.0);
 		}
-		DriveAxes axes = input.getDriveAxes();
-		return new DriveInput(axes.forward(), axes.left(), axes.counterClockwiseRotation());
+		return new DriveInput(input.getAxisValue(AxialInput.DRIVETRAIN_DRIVE_X),
+			input.getAxisValue(AxialInput.DRIVETRAIN_DRIVE_Y),
+			input.getAxisValue(AxialInput.DRIVETRAIN_ROTATE));
 	}
 
 	/** Construct validated speed limits using Phoenix Tuner X measured speed and module radius. */
@@ -123,15 +124,9 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	}
 
 	@Override
-	public boolean updateAutonomous(AutoFSMState autoState) {
-		// Path following is intentionally not part of this generic input FSM.
-		stop();
-		return true;
-	}
-
-	@Override
-	protected DriveState nextState(TeleopInput input) {
-		return input == null || !input.isDriverControllerConnected() ? DriveState.STOPPED : DriveState.DRIVING;
+	protected DriveState nextState(Input input) {
+		return input == null || !input.isDriverControllerConnected()
+			? DriveState.STOPPED : DriveState.DRIVING;
 	}
 
 	private void stop() {
