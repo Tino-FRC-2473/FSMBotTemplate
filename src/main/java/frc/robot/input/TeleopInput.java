@@ -37,12 +37,14 @@ public final class TeleopInput extends Input {
 				case DRIVETRAIN_DRIVE_X -> driverConnected ? -driver.getLeftY() : 0.0;
 				case DRIVETRAIN_DRIVE_Y -> driverConnected ? -driver.getLeftX() : 0.0;
 				case DRIVETRAIN_ROTATE -> driverConnected ? -driver.getRightX() : 0.0;
-				case CLIMBER_MANUAL_CONTROL -> mechanismConnected ? mechanism.getLeftX() : 0.0;
 			};
 			sampleAxis(axis, value);
 		}
 		for (ButtonInput button : ButtonInput.values()) {
-			boolean connected = button.usesDriverController() ? driverConnected : mechanismConnected;
+			boolean connected = switch (button.controller()) {
+				case DRIVE -> driverConnected;
+				case MECH -> mechanismConnected;
+			};
 			sampleButton(button, connected && readButton(button));
 		}
 	}
@@ -50,26 +52,6 @@ public final class TeleopInput extends Input {
 	private boolean readButton(ButtonInput button) {
 		return switch (button) {
 			case DRIVETRAIN_RESEED -> driver.getStartButton();
-			case DRIVETRAIN_PATHFIND -> driver.getYButton();
-			case DRIVETRAIN_INVERT_CONTROLS -> driver.getBackButton();
-			case FACE_HUB -> driver.getRightTriggerAxis() > TRIGGER_THRESHOLD;
-			case FACE_PASS -> driver.getLeftTriggerAxis() > TRIGGER_THRESHOLD;
-			case BALL_SHAKE_FRONT -> driver.getXButton();
-			case BALL_SHAKE_SIDE -> driver.getAButton();
-			case PARTIAL_OUT_BUTTON -> mechanism.getStartButton();
-			case INTAKE_BUTTON -> mechanism.getBButton();
-			case OUTTAKE_BUTTON -> mechanism.getAButton();
-			case FOLD_IN_BUTTON -> mechanism.getYButton();
-			case FOLD_OUT_BUTTON -> mechanism.getXButton();
-			case CLIMBER_MANUAL_OVERRIDE -> mechanism.getPOV() == 0;
-			case CLIMBER_NEXT_STEP -> mechanism.getPOV() == 270;
-			case CLIMBER_EMERGENCY_ABORT -> mechanism.getPOV() == 180;
-			case PASSER_PREP_TOGGLE -> mechanism.getRightBumperButton();
-			case SHOOTER_PREP_TOGGLE -> mechanism.getLeftTriggerAxis() > TRIGGER_THRESHOLD;
-			case MANUAL_SHOOT_TOGGLE -> mechanism.getLeftBumperButton();
-			case REV_FEEDER -> mechanism.getRightTriggerAxis() > TRIGGER_THRESHOLD;
-			case IDLE_SHOOTER_TOGGLE -> mechanism.getBackButton();
-			case CLIMBER_AUTO_UP_1, CLIMBER_AUTO_UP_2 -> false;
 		};
 	}
 }
