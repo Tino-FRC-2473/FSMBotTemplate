@@ -47,9 +47,14 @@ public abstract class Input {
 	final void beginSample(boolean driver, boolean mechanism, boolean synchronize) {
 		for (ButtonInput button : ButtonInput.values()) {
 			int index = button.ordinal();
-			boolean connected = button.usesDriverController() ? driver : mechanism;
-			boolean previouslyConnected = button.usesDriverController()
-				? driverConnected : mechanismConnected;
+			boolean connected = switch (button.controller()) {
+				case DRIVE -> driver;
+				case MECH -> mechanism;
+			};
+			boolean previouslyConnected = switch (button.controller()) {
+				case DRIVE -> driverConnected;
+				case MECH -> mechanismConnected;
+			};
 			pressed[index] = false;
 			released[index] = false;
 			if (!connected || synchronize || !previouslyConnected) {
@@ -63,7 +68,10 @@ public abstract class Input {
 
 	final void sampleButton(ButtonInput button, boolean raw) {
 		int index = button.ordinal();
-		boolean connected = button.usesDriverController() ? driverConnected : mechanismConnected;
+		boolean connected = switch (button.controller()) {
+			case DRIVE -> driverConnected;
+			case MECH -> mechanismConnected;
+		};
 		if (!connected) {
 			return;
 		}
@@ -79,8 +87,10 @@ public abstract class Input {
 	}
 
 	final void sampleAxis(AxialInput axis, double raw) {
-		boolean connected = axis == AxialInput.CLIMBER_MANUAL_CONTROL
-			? mechanismConnected : driverConnected;
+		boolean connected = switch (axis.controller()) {
+			case DRIVE -> driverConnected;
+			case MECH -> mechanismConnected;
+		};
 		axes[axis.ordinal()] = connected && Double.isFinite(raw)
 			? Math.max(-1.0, Math.min(1.0, raw)) : 0.0;
 	}
