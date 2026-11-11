@@ -55,12 +55,18 @@ public abstract class Input {
 		return released[Objects.requireNonNull(key, "button").ordinal()];
 	}
 
-	/** Whether the driver controller is currently connected. */
+	/**
+	 * Whether the driver controller is currently connected.
+	 * @return true while the driver controller is connected
+	 */
 	public final boolean isDriverControllerConnected() {
 		return driverConnected;
 	}
 
-	/** Whether the mechanism controller is currently connected. */
+	/**
+	 * Whether the mechanism controller is currently connected.
+	 * @return true while the mechanism controller is connected
+	 */
 	public final boolean isMechanismControllerConnected() {
 		return mechanismConnected;
 	}

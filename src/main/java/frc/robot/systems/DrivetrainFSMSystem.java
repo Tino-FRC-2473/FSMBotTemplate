@@ -21,7 +21,12 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 		DRIVING
 	}
 
-	/** Normalized chassis demand, with each component expected in the range [-1, 1]. */
+	/**
+	 * Normalized chassis demand, with each component expected in the range [-1, 1].
+	 * @param forward positive forward
+	 * @param left positive left
+	 * @param rotation positive counterclockwise
+	 */
 	public record DriveInput(double forward, double left, double rotation) { }
 
 	/** Converts operator input to normalized chassis demand. */
@@ -31,18 +36,27 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 		DriveInput apply(Input input);
 	}
 
-	/** Validated robot-provided drive limits and input deadband. */
+	/**
+	 * Validated robot-provided drive limits and input deadband.
+	 * @param maxLinearSpeedMetersPerSecond scaled chassis speed limit
+	 * @param maxAngularSpeedRadiansPerSecond derived chassis rotation limit
+	 * @param deadband per-axis normalized stick deadband
+	 */
 	public record Config(
 		double maxLinearSpeedMetersPerSecond,
 		double maxAngularSpeedRadiansPerSecond,
 		double deadband) {
+		/** Reject nonpositive or nonfinite limits and a deadband outside [0, 1). */
 		public Config {
-			if (!Double.isFinite(maxLinearSpeedMetersPerSecond) || maxLinearSpeedMetersPerSecond <= 0.0) {
-				throw new IllegalArgumentException("Maximum linear speed must be finite and positive");
+			if (!Double.isFinite(maxLinearSpeedMetersPerSecond)
+				|| maxLinearSpeedMetersPerSecond <= 0.0) {
+				throw new IllegalArgumentException(
+					"Maximum linear speed must be finite and positive");
 			}
 			if (!Double.isFinite(maxAngularSpeedRadiansPerSecond)
 				|| maxAngularSpeedRadiansPerSecond <= 0.0) {
-				throw new IllegalArgumentException("Maximum angular speed must be finite and positive");
+				throw new IllegalArgumentException(
+					"Maximum angular speed must be finite and positive");
 			}
 			if (!Double.isFinite(deadband) || deadband < 0.0 || deadband >= 1.0) {
 				throw new IllegalArgumentException("Deadband must be in the range [0, 1)");
@@ -56,17 +70,17 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 
 	/**
 	 * Create the drive FSM and immediately command a safe stopped state.
-	 * @param drivetrain drivetrain that owns the module outputs
-	 * @param config validated speed limits and deadband
-	 * @param inputMapper converts the teleop snapshot to normalized chassis demand
+	 * @param drivetrainSubsystem drivetrain that owns the module outputs
+	 * @param driveConfig validated speed limits and deadband
+	 * @param demandMapper converts the teleop snapshot to normalized chassis demand
 	 */
 	public DrivetrainFSMSystem(
-		CommandSwerveDrivetrain drivetrain,
-		Config config,
-		InputMapper inputMapper) {
-		this.drivetrain = Objects.requireNonNull(drivetrain, "drivetrain");
-		this.config = Objects.requireNonNull(config, "config");
-		this.inputMapper = Objects.requireNonNull(inputMapper, "inputMapper");
+		CommandSwerveDrivetrain drivetrainSubsystem,
+		Config driveConfig,
+		InputMapper demandMapper) {
+		this.drivetrain = Objects.requireNonNull(drivetrainSubsystem, "drivetrain");
+		this.config = Objects.requireNonNull(driveConfig, "config");
+		this.inputMapper = Objects.requireNonNull(demandMapper, "inputMapper");
 		reset();
 	}
 
@@ -105,7 +119,11 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 		setCurrentState(DriveState.DRIVING);
 	}
 
-	/** Convenience mapper for the built-in Xbox input abstraction. */
+	/**
+	 * Convenience mapper for the built-in Xbox input abstraction.
+	 * @param input teleop snapshot, or null outside teleop
+	 * @return normalized chassis demand, or zero demand when there is no driver
+	 */
 	public static DriveInput mapXboxInput(Input input) {
 		if (input == null || !input.isDriverControllerConnected()) {
 			return new DriveInput(0.0, 0.0, 0.0);
@@ -115,7 +133,14 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 			input.getAxisValue(AxialInput.DRIVETRAIN_ROTATE));
 	}
 
-	/** Construct validated speed limits using Phoenix Tuner X measured speed and module radius. */
+	/**
+	 * Construct validated speed limits using Phoenix Tuner X measured speed and module radius.
+	 * @param measuredMaxLinearSpeedMetersPerSecond generated free speed, in meters per second
+	 * @param maximumLinearSpeedScale fraction of the measured speed to allow
+	 * @param maximumModuleRadiusMeters farthest module distance from the robot center
+	 * @param deadband per-axis normalized stick deadband
+	 * @return validated limits with the angular limit derived from linear speed and radius
+	 */
 	public static Config configFromGeometry(
 		double measuredMaxLinearSpeedMetersPerSecond,
 		double maximumLinearSpeedScale,
@@ -123,14 +148,16 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 		double deadband) {
 		if (!Double.isFinite(measuredMaxLinearSpeedMetersPerSecond)
 			|| measuredMaxLinearSpeedMetersPerSecond <= 0.0) {
-			throw new IllegalArgumentException("Generated maximum linear speed must be finite and positive");
+			throw new IllegalArgumentException(
+				"Generated maximum linear speed must be finite and positive");
 		}
 		if (!Double.isFinite(maximumLinearSpeedScale)
 			|| maximumLinearSpeedScale <= 0.0 || maximumLinearSpeedScale > 1.0) {
 			throw new IllegalArgumentException("Maximum linear speed scale must be in (0, 1]");
 		}
 		if (!Double.isFinite(maximumModuleRadiusMeters) || maximumModuleRadiusMeters <= 0.0) {
-			throw new IllegalArgumentException("Generated module radius must be finite and positive");
+			throw new IllegalArgumentException(
+				"Generated module radius must be finite and positive");
 		}
 
 		double maxLinearSpeed = measuredMaxLinearSpeedMetersPerSecond * maximumLinearSpeedScale;

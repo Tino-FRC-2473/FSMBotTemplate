@@ -52,6 +52,7 @@ public class Robot extends LoggedRobot {
 	private boolean mechanismFaulted;
 	private boolean mechanismControllerWasConnected;
 
+	/** Configure AdvantageKit logging before any robot devices are constructed. */
 	public Robot() {
 		configureLogging();
 	}
@@ -96,11 +97,15 @@ public class Robot extends LoggedRobot {
 	 */
 	protected void initializeMechanisms() { }
 
-	/** Add a shared mechanism once; drivetrain and vision keep their dedicated lifecycle. */
+	/**
+	 * Add a shared mechanism once; drivetrain and vision keep their dedicated lifecycle.
+	 * @param mechanism mechanism to tick and reset with the other shared mechanisms
+	 */
 	protected final void registerMechanism(FSMSystem<?> mechanism) {
 		Objects.requireNonNull(mechanism, "mechanism");
 		if (mechanismRegistrationClosed) {
-			throw new IllegalStateException("Register mechanisms before loading autonomous routines");
+			throw new IllegalStateException(
+				"Register mechanisms before loading autonomous routines");
 		}
 		if (mechanism instanceof DrivetrainFSMSystem || mechanism instanceof VisionFSMSystem) {
 			throw new IllegalArgumentException("Drivetrain and vision are not shared mechanisms");
@@ -139,8 +144,8 @@ public class Robot extends LoggedRobot {
 			}
 			report(
 				"Swerve drivetrain was not initialized. Replace the TunerConstants scaffold "
-					+ "with this robot's unmodified 2026 Phoenix Tuner X output and verify its generated "
-					+ "speed and module geometry. Details: " + error);
+					+ "with this robot's unmodified 2026 Phoenix Tuner X output and "
+					+ "verify its generated speed and module geometry. Details: " + error);
 			return;
 		}
 
@@ -152,7 +157,8 @@ public class Robot extends LoggedRobot {
 			autonomousSystem = null;
 			report(
 				"PathPlanner autonomous is unavailable; teleop remains available. Configure "
-					+ "pathplanner/settings.json and autos in the deploy directory. Details: " + error);
+					+ "pathplanner/settings.json and autos in the deploy directory. "
+					+ "Details: " + error);
 		}
 
 		try {
@@ -162,11 +168,17 @@ public class Robot extends LoggedRobot {
 		} catch (RuntimeException error) {
 			visionFSM = null;
 			report(
-				"Limelight vision was not initialized; drivetrain remains available. Details: " + error);
+				"Limelight vision was not initialized; drivetrain remains available. "
+					+ "Details: " + error);
 		}
 	}
 
-	/** Lazily create the camera integration so the disabled path has no NetworkTables side effects. */
+	/**
+	 * Lazily create the camera integration so the disabled path has no side effects.
+	 * @param enabled whether Limelight vision is configured for this robot
+	 * @param visionFactory factory invoked only when vision is enabled
+	 * @return the created vision FSM, or null when vision is disabled
+	 */
 	static VisionFSMSystem createVisionIfEnabled(
 		boolean enabled,
 		Supplier<VisionFSMSystem> visionFactory) {
@@ -174,7 +186,10 @@ public class Robot extends LoggedRobot {
 		return enabled ? Objects.requireNonNull(visionFactory.get(), "visionFactory result") : null;
 	}
 
-	/** Report failures on hardware and warnings in simulation so desktop tests stay readable. */
+	/**
+	 * Report failures on hardware and warnings in simulation so desktop tests stay readable.
+	 * @param message diagnostic text to publish to the Driver Station
+	 */
 	private void report(String message) {
 		if (RobotBase.isReal()) {
 			DriverStation.reportError(message, false);
@@ -186,6 +201,7 @@ public class Robot extends LoggedRobot {
 	/**
 	 * Camera settings used only when
 	 * {@link Constants.RobotIntegration#ENABLE_LIMELIGHT_VISION} is true.
+	 * @return default camera configuration for the configured Limelight
 	 */
 	protected VisionFSMSystem.Config getVisionConfig() {
 		// Defaults assume the camera mounting transform is configured in Limelight Web UI.
@@ -335,7 +351,8 @@ public class Robot extends LoggedRobot {
 			mechanismFaulted = true;
 			cancelAutoAndReset();
 			report(
-				"Mechanism update failed; shared mechanisms stopped until robot code restarts: " + error);
+				"Mechanism update failed; shared mechanisms stopped until robot code restarts: "
+					+ error);
 		}
 	}
 
@@ -347,7 +364,8 @@ public class Robot extends LoggedRobot {
 			} catch (RuntimeException error) {
 				mechanismFaulted = true;
 				if (failure == null) {
-					failure = new IllegalStateException("One or more mechanisms could not reset safely");
+					failure = new IllegalStateException(
+						"One or more mechanisms could not reset safely");
 				}
 				failure.addSuppressed(error);
 			}
@@ -366,7 +384,8 @@ public class Robot extends LoggedRobot {
 		} catch (RuntimeException error) {
 			visionFSM = null;
 			report(
-				"Limelight vision disabled after a runtime failure; drive remains available: " + error);
+				"Limelight vision disabled after a runtime failure; drive remains available: "
+					+ error);
 		}
 	}
 

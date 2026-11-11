@@ -13,6 +13,7 @@ public final class TeleopInput extends Input {
 	private final XboxController driver;
 	private final XboxController mechanism;
 
+	/** Open both configured Xbox controllers. */
 	public TeleopInput() {
 		driver = new XboxController(Constants.RobotIntegration.DRIVER_CONTROLLER_PORT);
 		mechanism = new XboxController(Constants.RobotIntegration.MECHANISM_CONTROLLER_PORT);

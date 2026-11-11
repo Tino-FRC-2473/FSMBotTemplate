@@ -45,8 +45,15 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		TOO_FAR
 	}
 
-	/** Optional inclusive field coordinate bounds, in meters. */
+	/**
+	 * Optional inclusive field coordinate bounds, in meters.
+	 * @param minX minimum field x, in meters
+	 * @param maxX maximum field x, in meters
+	 * @param minY minimum field y, in meters
+	 * @param maxY maximum field y, in meters
+	 */
 	public record FieldBounds(double minX, double maxX, double minY, double maxY) {
+		/** Reject nonfinite or inverted bounds. */
 		public FieldBounds {
 			if (!Double.isFinite(minX) || !Double.isFinite(maxX)
 				|| !Double.isFinite(minY) || !Double.isFinite(maxY)
@@ -61,7 +68,20 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		}
 	}
 
-	/** Camera pose, quality gates, and measurement uncertainty for one Limelight. */
+	/**
+	 * Camera pose, quality gates, and measurement uncertainty for one Limelight.
+	 * @param limelightName NetworkTables name of the camera
+	 * @param aprilTagPipeline AprilTag pipeline index
+	 * @param configureCameraPose whether to push the mounting transform to the camera
+	 * @param robotToCamera camera mounting transform, used only when configuring the pose
+	 * @param maxMeasurementAgeSeconds oldest acceptable measurement, in seconds
+	 * @param maxFutureTimestampSeconds largest tolerated future timestamp offset, in seconds
+	 * @param maxTagAmbiguity highest acceptable per-tag ambiguity
+	 * @param maxAverageTagDistanceMeters farthest acceptable average tag distance
+	 * @param fieldBounds optional inclusive field bounds, or null to skip the check
+	 * @param measurementStdDevs noise passed to the pose estimator
+	 * @param poseTransform optional transform applied to accepted poses
+	 */
 	public record Config(
 		String limelightName,
 		int aprilTagPipeline,
@@ -74,6 +94,7 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		FieldBounds fieldBounds,
 		Matrix<N3, N1> measurementStdDevs,
 		UnaryOperator<Pose2d> poseTransform) {
+		/** Validate camera identification, required objects, and quality limits. */
 		public Config {
 			if (limelightName == null || limelightName.isBlank()) {
 				throw new IllegalArgumentException("Limelight name must not be blank");
@@ -88,11 +109,19 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 			if (!Double.isFinite(maxMeasurementAgeSeconds) || maxMeasurementAgeSeconds < 0.0
 				|| !Double.isFinite(maxFutureTimestampSeconds) || maxFutureTimestampSeconds < 0.0
 				|| !Double.isFinite(maxTagAmbiguity) || maxTagAmbiguity < 0.0
-				|| !Double.isFinite(maxAverageTagDistanceMeters) || maxAverageTagDistanceMeters <= 0.0) {
-				throw new IllegalArgumentException("Vision quality limits must be finite and nonnegative");
+				|| !Double.isFinite(maxAverageTagDistanceMeters)
+				|| maxAverageTagDistanceMeters <= 0.0) {
+				throw new IllegalArgumentException(
+					"Vision quality limits must be finite and nonnegative");
 			}
 		}
 
+		/**
+		 * Build a configuration with template defaults and no field bounds.
+		 * @param limelightName NetworkTables name of the camera
+		 * @param pipeline AprilTag pipeline index
+		 * @return configuration using the generic vision defaults
+		 */
 		public static Config defaults(String limelightName, int pipeline) {
 			return new Config(
 				limelightName,
@@ -112,6 +141,12 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	/** Consumer lets this FSM fuse through the robot's drivetrain or pose estimator. */
 	@FunctionalInterface
 	public interface VisionConsumer {
+		/**
+		 * Consume one accepted field pose.
+		 * @param pose field-relative pose to fuse
+		 * @param timestampSeconds FPGA timestamp of the camera frame
+		 * @param standardDeviations measurement noise for the pose estimator
+		 */
 		void accept(Pose2d pose, double timestampSeconds, Matrix<N3, N1> standardDeviations);
 	}
 
@@ -125,11 +160,11 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	/**
 	 * Create a vision FSM bound to a drivetrain's heading, yaw rate, and pose estimator.
 	 * @param drivetrain source of gyro heading and consumer of accepted measurements
-	 * @param config camera name, quality gates, and measurement noise
+	 * @param cameraConfig camera name, quality gates, and measurement noise
 	 */
-	public VisionFSMSystem(CommandSwerveDrivetrain drivetrain, Config config) {
+	public VisionFSMSystem(CommandSwerveDrivetrain drivetrain, Config cameraConfig) {
 		this(
-			config,
+			cameraConfig,
 			drivetrain::getRobotRotation3d,
 			() -> Math.toDegrees(drivetrain.getAngularVelocityRadiansPerSecond()),
 			drivetrain::addVisionMeasurement);
@@ -137,21 +172,22 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 
 	/**
 	 * Create a vision FSM with injected estimator seams so vision can be tested without CAN.
-	 * @param config camera name, quality gates, and measurement noise
-	 * @param robotRotationSupplier field-aligned robot rotation published for MegaTag2
-	 * @param angularVelocityDegreesPerSecondSupplier measured yaw rate in degrees per second
-	 * @param visionConsumer consumer for accepted poses and their standard deviations
+	 * @param cameraConfig camera name, quality gates, and measurement noise
+	 * @param rotationSupplier field-aligned robot rotation published for MegaTag2
+	 * @param yawRateSupplier measured yaw rate in degrees per second
+	 * @param poseConsumer consumer for accepted poses and their standard deviations
 	 */
 	public VisionFSMSystem(
-		Config config,
-		Supplier<Rotation3d> robotRotationSupplier,
-		Supplier<Double> angularVelocityDegreesPerSecondSupplier,
-		VisionConsumer visionConsumer) {
-		this.config = Objects.requireNonNull(config, "config");
-		this.robotRotationSupplier = Objects.requireNonNull(robotRotationSupplier, "robotRotationSupplier");
-		this.angularVelocityDegreesPerSecondSupplier = Objects.requireNonNull(
-			angularVelocityDegreesPerSecondSupplier, "angularVelocityDegreesPerSecondSupplier");
-		this.visionConsumer = Objects.requireNonNull(visionConsumer, "visionConsumer");
+		Config cameraConfig,
+		Supplier<Rotation3d> rotationSupplier,
+		Supplier<Double> yawRateSupplier,
+		VisionConsumer poseConsumer) {
+		this.config = Objects.requireNonNull(cameraConfig, "config");
+		this.robotRotationSupplier =
+			Objects.requireNonNull(rotationSupplier, "robotRotationSupplier");
+		this.angularVelocityDegreesPerSecondSupplier =
+			Objects.requireNonNull(yawRateSupplier, "angularVelocityDegreesPerSecondSupplier");
+		this.visionConsumer = Objects.requireNonNull(poseConsumer, "visionConsumer");
 
 		LimelightHelpers.setPipelineIndex(config.limelightName(), config.aprilTagPipeline());
 		LimelightHelpers.setLEDMode_PipelineControl(config.limelightName());
@@ -205,7 +241,8 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 			Math.toDegrees(robotRotation.getY()), 0.0,
 			Math.toDegrees(robotRotation.getX()), 0.0);
 
-		PoseEstimate estimate = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.limelightName());
+		PoseEstimate estimate =
+			LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.limelightName());
 		if (estimate == null || estimate.tagCount <= 0) {
 			lastRejectionReason = RejectionReason.NO_TAGS;
 			setCurrentState(VisionState.WAITING_FOR_TAGS);
@@ -245,8 +282,15 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		logResult(estimate, RejectionReason.NONE, true);
 	}
 
-	/** Pure validation function for testing and alternate integrations. */
-	public static RejectionReason validateEstimate(PoseEstimate estimate, double nowSeconds, Config config) {
+	/**
+	 * Pure validation function for testing and alternate integrations.
+	 * @param estimate pose estimate to validate
+	 * @param nowSeconds current FPGA timestamp, in seconds
+	 * @param config quality gates to apply
+	 * @return the rejection reason, or {@link RejectionReason#NONE} when acceptable
+	 */
+	public static RejectionReason validateEstimate(
+		PoseEstimate estimate, double nowSeconds, Config config) {
 		Objects.requireNonNull(config, "config");
 		if (estimate == null || estimate.tagCount <= 0) {
 			return RejectionReason.NO_TAGS;
@@ -296,6 +340,12 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 			&& Double.isFinite(pose.getRotation().getRadians());
 	}
 
+	/**
+	 * Whether a camera timestamp is usable and newer than the last fused frame.
+	 * @param timestampSeconds timestamp of the incoming estimate
+	 * @param previousTimestampSeconds timestamp of the last fused estimate
+	 * @return true when the estimate is finite, positive, and strictly newer
+	 */
 	public static boolean isTimestampNew(double timestampSeconds, double previousTimestampSeconds) {
 		return Double.isFinite(timestampSeconds)
 			&& timestampSeconds > 0.0

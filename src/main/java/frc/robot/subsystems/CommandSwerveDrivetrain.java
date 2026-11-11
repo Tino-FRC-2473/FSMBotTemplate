@@ -48,12 +48,19 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 	private Notifier simNotifier;
 	private double lastSimTimeSeconds;
 	private static final double DETAILED_LOG_PERIOD_SECONDS = 0.05;
+	private static final double CONTROL_LOOP_PERIOD_SECONDS = 0.020;
+	private static final double MILLISECONDS_PER_SECOND = 1000.0;
 	private final String[] moduleNames = {"FrontLeft", "FrontRight", "BackLeft", "BackRight"};
 	private double lastDetailedLogTimestampSeconds = Double.NEGATIVE_INFINITY;
 	private volatile double commandedVxMetersPerSecond;
 	private volatile double commandedVyMetersPerSecond;
 	private volatile double commandedOmegaRadiansPerSecond;
 
+	/**
+	 * Create the drivetrain from Phoenix Tuner X generated constants.
+	 * @param drivetrainConstants CAN bus and pigeon configuration
+	 * @param modules generated per-module constants in FL, FR, BL, BR order
+	 */
 	public CommandSwerveDrivetrain(
 		SwerveDrivetrainConstants drivetrainConstants,
 		SwerveModuleConstants<?, ?, ?>... modules) {
@@ -66,7 +73,12 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		}
 	}
 
-	/** Apply a field-relative chassis velocity in meters/second and radians/second. */
+	/**
+	 * Apply a field-relative chassis velocity.
+	 * @param velocityX forward velocity in meters per second
+	 * @param velocityY left velocity in meters per second
+	 * @param angularRate counterclockwise rotation in radians per second
+	 */
 	public void driveFieldCentric(double velocityX, double velocityY, double angularRate) {
 		commandedVxMetersPerSecond = velocityX;
 		commandedVyMetersPerSecond = velocityY;
@@ -77,12 +89,19 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 			.withRotationalRate(angularRate));
 	}
 
-	/** Measured chassis speeds in the robot frame, independent of alliance perspective. */
+	/**
+	 * Measured chassis speeds in the robot frame, independent of alliance perspective.
+	 * @return measured robot-relative chassis speeds
+	 */
 	public ChassisSpeeds getRobotRelativeSpeeds() {
 		return getState().Speeds;
 	}
 
-	/** Apply PathPlanner velocities and per-module force feedforwards in FL, FR, BL, BR order. */
+	/**
+	 * Apply PathPlanner velocities and per-module force feedforwards in FL, FR, BL, BR order.
+	 * @param speeds robot-relative chassis speeds
+	 * @param feedforwards per-module force feedforwards from PathPlanner
+	 */
 	public void driveRobotRelative(ChassisSpeeds speeds, DriveFeedforwards feedforwards) {
 		commandedVxMetersPerSecond = speeds.vxMetersPerSecond;
 		commandedVyMetersPerSecond = speeds.vyMetersPerSecond;
@@ -92,7 +111,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		Logger.recordOutput("Drivetrain/Chassis/PathPlannerFeedforwardY_N",
 			feedforwards.robotRelativeForcesYNewtons());
 		setControl(autonomousRequest
-			.withSpeeds(ChassisSpeeds.discretize(speeds, 0.020))
+			.withSpeeds(ChassisSpeeds.discretize(speeds, CONTROL_LOOP_PERIOD_SECONDS))
 			.withWheelForceFeedforwardsX(feedforwards.robotRelativeForcesXNewtons())
 			.withWheelForceFeedforwardsY(feedforwards.robotRelativeForcesYNewtons()));
 	}
@@ -102,30 +121,42 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		driveFieldCentric(0.0, 0.0, 0.0);
 	}
 
-	/** Log chassis state on every Phoenix odometry update and detailed hardware signals at 20 Hz. */
+	/**
+	 * Log chassis state on every Phoenix odometry update and detailed signals at 20 Hz.
+	 * @param state Phoenix odometry snapshot delivered by the drivetrain
+	 */
 	private void logDrivetrainTelemetry(SwerveDriveState state) {
 		Logger.recordOutput("Drivetrain/Chassis/Pose", state.Pose);
 		Logger.recordOutput("Drivetrain/Chassis/PoseX_m", state.Pose.getX());
 		Logger.recordOutput("Drivetrain/Chassis/PoseY_m", state.Pose.getY());
-		Logger.recordOutput("Drivetrain/Chassis/Heading_deg", state.Pose.getRotation().getDegrees());
+		Logger.recordOutput(
+			"Drivetrain/Chassis/Heading_deg", state.Pose.getRotation().getDegrees());
 		Logger.recordOutput("Drivetrain/Chassis/RawHeading_deg", state.RawHeading.getDegrees());
 		Logger.recordOutput("Drivetrain/Chassis/MeasuredVx_mps", state.Speeds.vxMetersPerSecond);
 		Logger.recordOutput("Drivetrain/Chassis/MeasuredVy_mps", state.Speeds.vyMetersPerSecond);
-		Logger.recordOutput("Drivetrain/Chassis/MeasuredOmega_radps", state.Speeds.omegaRadiansPerSecond);
+		Logger.recordOutput(
+			"Drivetrain/Chassis/MeasuredOmega_radps", state.Speeds.omegaRadiansPerSecond);
 		Logger.recordOutput("Drivetrain/Chassis/CommandedVx_mps", commandedVxMetersPerSecond);
 		Logger.recordOutput("Drivetrain/Chassis/CommandedVy_mps", commandedVyMetersPerSecond);
-		Logger.recordOutput("Drivetrain/Chassis/CommandedOmega_radps", commandedOmegaRadiansPerSecond);
-		Logger.recordOutput("Drivetrain/Chassis/OdometryPeriod_ms", state.OdometryPeriod * 1000.0);
+		Logger.recordOutput(
+			"Drivetrain/Chassis/CommandedOmega_radps", commandedOmegaRadiansPerSecond);
+		Logger.recordOutput(
+			"Drivetrain/Chassis/OdometryPeriod_ms",
+			state.OdometryPeriod * MILLISECONDS_PER_SECOND);
 		Logger.recordOutput("Drivetrain/Chassis/SuccessfulDaqs", state.SuccessfulDaqs);
 		Logger.recordOutput("Drivetrain/Chassis/FailedDaqs", state.FailedDaqs);
 		Logger.recordOutput("Drivetrain/Chassis/OdometryValid", isOdometryValid());
-		Logger.recordOutput("Drivetrain/Chassis/BatteryVoltage", RobotController.getBatteryVoltage());
+		Logger.recordOutput(
+			"Drivetrain/Chassis/BatteryVoltage", RobotController.getBatteryVoltage());
 
-		if (state.ModuleStates == null || state.ModuleTargets == null || state.ModulePositions == null) {
+		if (state.ModuleStates == null
+			|| state.ModuleTargets == null
+			|| state.ModulePositions == null) {
 			return;
 		}
 		for (int index = 0; index < moduleNames.length && index < state.ModuleStates.length
-			&& index < state.ModuleTargets.length && index < state.ModulePositions.length; index++) {
+			&& index < state.ModuleTargets.length
+			&& index < state.ModulePositions.length; index++) {
 			String modulePath = "Drivetrain/Modules/" + moduleNames[index];
 			var measured = state.ModuleStates[index];
 			var target = state.ModuleTargets[index];
@@ -135,7 +166,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 			Logger.recordOutput(modulePath + "/TargetSpeed_mps", target.speedMetersPerSecond);
 			Logger.recordOutput(modulePath + "/TargetAngle_deg", target.angle.getDegrees());
 			Logger.recordOutput(modulePath + "/DriveDistance_m", position.distanceMeters);
-			Logger.recordOutput(modulePath + "/ModulePositionAngle_deg", position.angle.getDegrees());
+			Logger.recordOutput(
+				modulePath + "/ModulePositionAngle_deg", position.angle.getDegrees());
 		}
 
 		if (state.Timestamp - lastDetailedLogTimestampSeconds < DETAILED_LOG_PERIOD_SECONDS) {
@@ -161,9 +193,11 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		logSignal(encoderRoot + "/Position", encoder.getPosition());
 		logSignal(encoderRoot + "/Velocity", encoder.getVelocity());
 		logSignal(encoderRoot + "/SupplyVoltage", encoder.getSupplyVoltage());
-		Logger.recordOutput(encoderRoot + "/MagnetHealth", encoder.getMagnetHealth().getValue().toString());
+		Logger.recordOutput(
+			encoderRoot + "/MagnetHealth", encoder.getMagnetHealth().getValue().toString());
 		Logger.recordOutput(encoderRoot + "/Faults", encoder.getFaultField().getValue().toString());
-		Logger.recordOutput(encoderRoot + "/StickyFaults", encoder.getStickyFaultField().getValue().toString());
+		Logger.recordOutput(
+			encoderRoot + "/StickyFaults", encoder.getStickyFaultField().getValue().toString());
 	}
 
 	private void logMotor(String root, TalonFX motor) {
@@ -186,7 +220,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		logSignal(root + "/ClosedLoopFeedForward", motor.getClosedLoopFeedForward());
 		Logger.recordOutput(root + "/ControlMode", motor.getControlMode().getValue().toString());
 		Logger.recordOutput(root + "/Faults", motor.getFaultField().getValue().toString());
-		Logger.recordOutput(root + "/StickyFaults", motor.getStickyFaultField().getValue().toString());
+		Logger.recordOutput(
+			root + "/StickyFaults", motor.getStickyFaultField().getValue().toString());
 	}
 
 	private void logGyroTelemetry() {
@@ -195,9 +230,9 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		Rotation3d rotation = gyro.getRotation3d();
 		Logger.recordOutput(root + "/Connected", gyro.isConnected());
 		Logger.recordOutput(root + "/Rotation", rotation);
-		Logger.recordOutput(root + "/Yaw_deg", rotation.getZ() * 180.0 / Math.PI);
-		Logger.recordOutput(root + "/Pitch_deg", rotation.getY() * 180.0 / Math.PI);
-		Logger.recordOutput(root + "/Roll_deg", rotation.getX() * 180.0 / Math.PI);
+		Logger.recordOutput(root + "/Yaw_deg", Math.toDegrees(rotation.getZ()));
+		Logger.recordOutput(root + "/Pitch_deg", Math.toDegrees(rotation.getY()));
+		Logger.recordOutput(root + "/Roll_deg", Math.toDegrees(rotation.getX()));
 		logSignal(root + "/YawSignal", gyro.getYaw());
 		logSignal(root + "/PitchSignal", gyro.getPitch());
 		logSignal(root + "/RollSignal", gyro.getRoll());
@@ -210,22 +245,30 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 		logSignal(root + "/SupplyVoltage", gyro.getSupplyVoltage());
 		logSignal(root + "/Temperature", gyro.getTemperature());
 		Logger.recordOutput(root + "/Faults", gyro.getFaultField().getValue().toString());
-		Logger.recordOutput(root + "/StickyFaults", gyro.getStickyFaultField().getValue().toString());
+		Logger.recordOutput(
+			root + "/StickyFaults", gyro.getStickyFaultField().getValue().toString());
 	}
 
 	private static void logSignal(String key, StatusSignal<?> signal) {
 		String leafName = key.substring(key.lastIndexOf('/') + 1);
 		String parentPath = key.substring(0, key.lastIndexOf('/'));
 		Logger.recordOutput(key + " (" + signal.getUnits() + ")", signal.getValueAsDouble());
-		Logger.recordOutput(parentPath + "/SignalStatus/" + leafName, signal.getStatus().toString());
+		Logger.recordOutput(
+			parentPath + "/SignalStatus/" + leafName, signal.getStatus().toString());
 	}
 
-	/** Current fused field pose. */
+	/**
+	 * Current fused field pose.
+	 * @return the estimator's current field-relative pose
+	 */
 	public Pose2d getPose() {
 		return getState().Pose;
 	}
 
-	/** Field-aligned yaw plus Pigeon roll/pitch for Limelight MegaTag2 input. */
+	/**
+	 * Field-aligned yaw plus Pigeon roll/pitch for Limelight MegaTag2 input.
+	 * @return estimator heading with measured roll and pitch
+	 */
 	public Rotation3d getRobotRotation3d() {
 		Rotation3d pigeonRotation = getPigeon2().getRotation3d();
 		// resetPose changes estimator heading, not necessarily the Pigeon's raw yaw.
@@ -233,12 +276,18 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 			getPose().getRotation().getRadians());
 	}
 
-	/** Current measured robot angular velocity in radians/second. */
+	/**
+	 * Current measured robot angular velocity.
+	 * @return measured yaw rate in radians per second
+	 */
 	public double getAngularVelocityRadiansPerSecond() {
 		return getState().Speeds.omegaRadiansPerSecond;
 	}
 
-	/** Maximum radius of the generated module locations from the robot center. */
+	/**
+	 * Maximum radius of the generated module locations from the robot center.
+	 * @return distance from the robot center to the farthest module, in meters
+	 */
 	public double getMaximumModuleRadiusMeters() {
 		double maxRadius = 0.0;
 		for (Translation2d location : getModuleLocations()) {
@@ -267,7 +316,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 	 */
 	@Override
 	public void addVisionMeasurement(Pose2d visionRobotPoseMeters, double timestampSeconds) {
-		super.addVisionMeasurement(visionRobotPoseMeters, Utils.fpgaToCurrentTime(timestampSeconds));
+		super.addVisionMeasurement(
+			visionRobotPoseMeters, Utils.fpgaToCurrentTime(timestampSeconds));
 	}
 
 	@Override

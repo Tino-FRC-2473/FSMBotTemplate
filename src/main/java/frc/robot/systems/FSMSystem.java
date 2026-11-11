@@ -15,7 +15,10 @@ import frc.robot.input.Input;
 public abstract class FSMSystem<S> implements Subsystem {
 	private S currentState;
 
-	/** Return the current state. */
+	/**
+	 * Return the current state.
+	 * @return the state most recently assigned
+	 */
 	public S getCurrentState() {
 		return currentState;
 	}
@@ -29,7 +32,10 @@ public abstract class FSMSystem<S> implements Subsystem {
 		currentState = Objects.requireNonNull(state, "state");
 	}
 
-	/** Internal-transition convenience using the same public setter. */
+	/**
+	 * Internal-transition convenience using the same public setter.
+	 * @param newState state for the next update
+	 */
 	public void setCurrentState(S newState) {
 		setState(newState);
 	}

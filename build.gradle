@@ -1,5 +1,6 @@
 plugins {
     id "java"
+    id "checkstyle"
     id "edu.wpi.first.GradleRIO" version "2026.2.1"
 }
 
@@ -7,6 +8,13 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
+
+checkstyle {
+    configFile = file("checks.xml")
+}
+
+// The CI workflow checks src/main/java only; keep the Gradle scope identical.
+tasks.named('checkstyleTest') { enabled = false }
 
 def ROBOT_MAIN_CLASS = "frc.robot.Main"
 

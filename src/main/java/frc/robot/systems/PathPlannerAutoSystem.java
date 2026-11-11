@@ -21,6 +21,7 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
 /** PathPlanner owns drive output only during autonomous; teleop remains manually ticked. */
 public final class PathPlannerAutoSystem {
 	private static final double MODULE_LOCATION_TOLERANCE_METERS = 0.001;
+	private static final int SWERVE_MODULE_COUNT = 4;
 
 	private final SendableChooser<Command> chooser;
 	private final Runnable stopDrive;
@@ -29,7 +30,13 @@ public final class PathPlannerAutoSystem {
 	private Command activeCommand;
 	private boolean runtimeFailed;
 
-	/** Configure and preload GUI autos; callers must isolate failure from teleop initialization. */
+	/**
+	 * Configure and preload GUI autos; callers must isolate failure from teleop initialization.
+	 * @param drivetrain drivetrain supplying pose, speeds, and PathPlanner output
+	 * @param resetMechanisms callback that returns shared mechanisms to their safe states
+	 * @return the preloaded auto system
+	 * @throws Exception when the PathPlanner GUI settings are missing or invalid
+	 */
 	public static PathPlannerAutoSystem create(
 		CommandSwerveDrivetrain drivetrain, Runnable resetMechanisms) throws Exception {
 		RobotConfig config = RobotConfig.fromGUISettings();
@@ -50,19 +57,27 @@ public final class PathPlannerAutoSystem {
 	}
 
 	// Separate command lifecycle from CAN hardware so stops and cancellation can be tested.
-	PathPlannerAutoSystem(SendableChooser<Command> chooser, Runnable stopDrive) {
-		this(chooser, stopDrive, () -> { });
+	PathPlannerAutoSystem(SendableChooser<Command> autoChooser, Runnable driveStopper) {
+		this(autoChooser, driveStopper, () -> { });
 	}
 
-	/** Bind preloaded commands to drive stop and shared-mechanism reset callbacks. */
+	/**
+	 * Bind preloaded commands to drive stop and shared-mechanism reset callbacks.
+	 * @param autoChooser dashboard selector for the preloaded routines
+	 * @param driveStopper callback that immediately commands zero drive output
+	 * @param mechanismReset callback that resets every shared mechanism
+	 */
 	public PathPlannerAutoSystem(
-		SendableChooser<Command> chooser, Runnable stopDrive, Runnable resetMechanisms) {
-		this.chooser = Objects.requireNonNull(chooser, "chooser");
-		this.stopDrive = Objects.requireNonNull(stopDrive, "stopDrive");
-		this.resetMechanisms = Objects.requireNonNull(resetMechanisms, "resetMechanisms");
+		SendableChooser<Command> autoChooser, Runnable driveStopper, Runnable mechanismReset) {
+		this.chooser = Objects.requireNonNull(autoChooser, "chooser");
+		this.stopDrive = Objects.requireNonNull(driveStopper, "stopDrive");
+		this.resetMechanisms = Objects.requireNonNull(mechanismReset, "resetMechanisms");
 	}
 
-	/** Dashboard selector; the default is PathPlanner's nonmoving "None" option. */
+	/**
+	 * Dashboard selector; the default is PathPlanner's nonmoving "None" option.
+	 * @return the selector published to the dashboard
+	 */
 	public SendableChooser<Command> getChooser() {
 		return chooser;
 	}
@@ -90,7 +105,10 @@ public final class PathPlannerAutoSystem {
 		}
 	}
 
-	/** Whether shared mechanisms may execute autonomous outputs this loop. */
+	/**
+	 * Whether shared mechanisms may execute autonomous outputs this loop.
+	 * @return true while an autonomous routine is scheduled and enabled
+	 */
 	public boolean isRunning() {
 		return activeCommand != null && !runtimeFailed && activeCommand.isScheduled()
 			&& DriverStation.isAutonomousEnabled();
@@ -114,13 +132,15 @@ public final class PathPlannerAutoSystem {
 				cancel();
 			}
 		} catch (RuntimeException error) {
-			// An exception inside run() can leave scheduler queues inconsistent. Do not run it again.
+			// An exception inside run() can leave scheduler queues inconsistent.
+			// Do not run it again.
 			runtimeFailed = true;
 			CommandScheduler.getInstance().disable();
 			cancel();
 			DriverStation.reportError(
-				"PathPlanner auto stopped after a runtime failure; restart robot code before retrying: "
-					+ error, error.getStackTrace());
+				"PathPlanner auto stopped after a runtime failure; "
+					+ "restart robot code before retrying: " + error,
+				error.getStackTrace());
 		}
 	}
 
@@ -164,9 +184,14 @@ public final class PathPlannerAutoSystem {
 		return alliance.orElse(Alliance.Blue) == Alliance.Red;
 	}
 
-	/** Reject incorrect GUI physics or module ordering rather than attempting unsafe following. */
+	/**
+	 * Reject incorrect GUI physics or module ordering rather than attempting unsafe following.
+	 * @param config PathPlanner robot configuration loaded from the GUI settings
+	 * @param moduleLocations generated module locations in FL, FR, BL, BR order
+	 */
 	static void validateConfig(RobotConfig config, Translation2d[] moduleLocations) {
-		if (!config.isHolonomic || config.numModules != 4 || moduleLocations.length != 4) {
+		if (!config.isHolonomic || config.numModules != SWERVE_MODULE_COUNT
+			|| moduleLocations.length != SWERVE_MODULE_COUNT) {
 			throw new IllegalArgumentException(
 				"PathPlanner requires four swerve modules in FL, FR, BL, BR order");
 		}
@@ -183,8 +208,8 @@ public final class PathPlannerAutoSystem {
 				|| !Double.isFinite(configured.getX()) || !Double.isFinite(configured.getY())
 				|| expected.getNorm() <= 0.0 || configured.getNorm() <= 0.0
 				|| configured.getDistance(expected) > MODULE_LOCATION_TOLERANCE_METERS) {
-				throw new IllegalArgumentException(
-					"PathPlanner module " + index + " location/order does not match TunerConstants");
+				throw new IllegalArgumentException("PathPlanner module " + index
+					+ " location/order does not match TunerConstants");
 			}
 		}
 	}
