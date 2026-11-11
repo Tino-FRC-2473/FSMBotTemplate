@@ -19,7 +19,6 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.imported.LimelightHelpers;
 import frc.robot.imported.LimelightHelpers.PoseEstimate;
 import frc.robot.imported.LimelightHelpers.RawFiducial;
-
 /**
  * Generic Limelight MegaTag2 localization FSM. Camera name, pipeline, mounting transform,
  * pose source, field bounds, quality thresholds, and measurement noise are injected by
