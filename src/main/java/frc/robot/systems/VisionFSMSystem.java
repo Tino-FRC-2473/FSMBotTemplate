@@ -212,27 +212,6 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 
 	@Override
 	public void update(Input input) {
-		updateVision();
-	}
-
-	@Override
-	protected VisionState nextState(Input input) {
-		return getCurrentState();
-	}
-
-	/**
-	 * Most recent rejection reason.
-	 * @return the last reason, or {@link RejectionReason#NONE} after a fused measurement
-	 */
-	public RejectionReason getLastRejectionReason() {
-		return lastRejectionReason;
-	}
-
-	/**
-	 * Publish orientation, read one MegaTag2 estimate, and fuse it when it passes validation.
-	 * Call at most once per loop; Robot owns the call because vision is not a shared mechanism.
-	 */
-	public void updateVision() {
 		Rotation3d robotRotation = robotRotationSupplier.get();
 		LimelightHelpers.SetRobotOrientation_NoFlush(
 			config.limelightName(),
@@ -243,43 +222,55 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 
 		PoseEstimate estimate =
 			LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.limelightName());
-		if (estimate == null || estimate.tagCount <= 0) {
-			lastRejectionReason = RejectionReason.NO_TAGS;
-			setCurrentState(VisionState.WAITING_FOR_TAGS);
-			logResult(estimate, lastRejectionReason, false);
-			return;
-		}
-		if (!Double.isFinite(estimate.timestampSeconds) || estimate.timestampSeconds <= 0.0) {
-			lastRejectionReason = RejectionReason.INVALID_TIMESTAMP;
-			setCurrentState(VisionState.REJECTING_ESTIMATE);
-			logResult(estimate, lastRejectionReason, false);
-			return;
-		}
-		if (!isTimestampNew(estimate.timestampSeconds, lastProcessedTimestampSeconds)) {
-			lastRejectionReason = RejectionReason.DUPLICATE_TIMESTAMP;
-			setCurrentState(VisionState.REJECTING_ESTIMATE);
-			logResult(estimate, lastRejectionReason, false);
-			return;
-		}
-		lastProcessedTimestampSeconds = estimate.timestampSeconds;
+		boolean fused = fuseIfValid(estimate);
+		setCurrentState(nextState(input));
+		logResult(estimate, lastRejectionReason, fused);
+	}
 
-		lastRejectionReason = validateEstimate(estimate, Timer.getFPGATimestamp(), config);
+	@Override
+	protected VisionState nextState(Input input) {
+		return switch (lastRejectionReason) {
+			case NONE -> VisionState.TRACKING;
+			case NO_TAGS -> VisionState.WAITING_FOR_TAGS;
+			default -> VisionState.REJECTING_ESTIMATE;
+		};
+	}
+
+	/**
+	 * Most recent rejection reason.
+	 * @return the last reason, or {@link RejectionReason#NONE} after a fused measurement
+	 */
+	public RejectionReason getLastRejectionReason() {
+		return lastRejectionReason;
+	}
+
+	// A rejected frame still consumes its timestamp so the same frame is never retried.
+	private boolean fuseIfValid(PoseEstimate estimate) {
+		lastRejectionReason = validateIncoming(estimate);
 		if (lastRejectionReason != RejectionReason.NONE) {
-			setCurrentState(VisionState.REJECTING_ESTIMATE);
-			logResult(estimate, lastRejectionReason, false);
-			return;
+			return false;
 		}
-
 		Pose2d pose = config.poseTransform().apply(estimate.pose);
 		if (pose == null || !isFinitePose(pose)) {
 			lastRejectionReason = RejectionReason.INVALID_POSE;
-			setCurrentState(VisionState.REJECTING_ESTIMATE);
-			logResult(estimate, lastRejectionReason, false);
-			return;
+			return false;
 		}
 		visionConsumer.accept(pose, estimate.timestampSeconds, config.measurementStdDevs());
-		setCurrentState(VisionState.TRACKING);
-		logResult(estimate, RejectionReason.NONE, true);
+		return true;
+	}
+
+	private RejectionReason validateIncoming(PoseEstimate estimate) {
+		if (estimate == null || estimate.tagCount <= 0) {
+			return RejectionReason.NO_TAGS;
+		}
+		if (!Double.isFinite(estimate.timestampSeconds) || estimate.timestampSeconds <= 0.0) {
+			return RejectionReason.INVALID_TIMESTAMP;
+		}
+		if (!isTimestampNew(estimate.timestampSeconds, lastProcessedTimestampSeconds)) {
+			return RejectionReason.DUPLICATE_TIMESTAMP;
+		}
+		lastProcessedTimestampSeconds = estimate.timestampSeconds;
+		return validateEstimate(estimate, Timer.getFPGATimestamp(), config);
 	}
 
 	/**

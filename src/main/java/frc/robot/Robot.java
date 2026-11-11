@@ -380,7 +380,7 @@ public class Robot extends LoggedRobot {
 			return;
 		}
 		try {
-			visionFSM.updateVision();
+			visionFSM.update(null);
 		} catch (RuntimeException error) {
 			visionFSM = null;
 			report(
