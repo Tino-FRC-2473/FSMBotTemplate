@@ -12,14 +12,14 @@ import frc.robot.Robot;
  */
 public class MotorManager {
 
-	/** A global list containing all logged motors. */
-	private static List<LoggedMotor> motorList = new ArrayList<>();
+	/** A global list containing all logged motors, in registration order. */
+	private static final List<LoggedMotor> MOTORS = new ArrayList<>();
 
 	/**
 	 * Updates all motors in the global list and logs information to Ascope.
 	 */
 	public static void update() {
-		for (LoggedMotor motor : motorList) {
+		for (LoggedMotor motor : MOTORS) {
 
 			// Update motor simulations
 			if (Robot.isSimulation()) {
@@ -42,17 +42,10 @@ public class MotorManager {
 	}
 
 	/**
-	 * Resets the motor list to an empty list.
-	 */
-	public static void reset() {
-		motorList.clear();
-	}
-
-	/**
 	 * Adds a motor to the motor list.
 	 * @param motor the motor to add
 	 */
 	public static void addMotor(LoggedMotor motor) {
-		motorList.add(motor);
+		MOTORS.add(motor);
 	}
 }

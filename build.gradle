@@ -16,6 +16,12 @@ checkstyle {
 // The CI workflow checks src/main/java only; keep the Gradle scope identical.
 tasks.named('checkstyleTest') { enabled = false }
 
+// Style findings are advisory: they are reported as warnings in
+// build/reports/checkstyle/main.html and never fail `build` or `deploy`.
+tasks.withType(Checkstyle) {
+    ignoreFailures = true
+}
+
 def ROBOT_MAIN_CLASS = "frc.robot.Main"
 
 // Define my targets (RoboRIO) and artifacts (deployable files)

@@ -3,6 +3,8 @@ package frc.robot.systems;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.littletonrobotics.junction.Logger;
+
 import edu.wpi.first.math.MathUtil;
 import frc.robot.input.Input;
 import frc.robot.input.InputTypes.AxialInput;
@@ -13,6 +15,8 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
  * abstraction; per-axis deadband, speed scaling, and all stop behavior are handled here.
  */
 public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveState> {
+	private static final String STATE_LOG_KEY = "Drivetrain/FSMState";
+
 	/** Drive output state reported once per tick. */
 	public enum DriveState {
 		/** No usable controller or every axis inside the deadband; zero demand is commanded. */
@@ -88,6 +92,7 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	public void reset() {
 		setCurrentState(DriveState.STOPPED);
 		drivetrain.stop();
+		Logger.recordOutput(STATE_LOG_KEY, DriveState.STOPPED.toString());
 	}
 
 	@Override
@@ -117,6 +122,7 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 			left * config.maxLinearSpeedMetersPerSecond(),
 			rotation * config.maxAngularSpeedRadiansPerSecond());
 		setCurrentState(DriveState.DRIVING);
+		Logger.recordOutput(STATE_LOG_KEY, DriveState.DRIVING.toString());
 	}
 
 	/**
@@ -173,6 +179,7 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	private void commandStop() {
 		drivetrain.stop();
 		setCurrentState(DriveState.STOPPED);
+		Logger.recordOutput(STATE_LOG_KEY, DriveState.STOPPED.toString());
 	}
 
 	static double applyDeadbandAndClamp(double value, double deadband) {

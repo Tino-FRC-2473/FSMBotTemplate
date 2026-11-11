@@ -101,17 +101,19 @@ public class SparkMaxWrapper extends SparkMax implements LoggedMotor {
 
 	@Override
 	public double getLoggedSetpoint() {
-		return motorSim.getSetpoint();
+		// Duty cycle on hardware, the simulated setpoint in simulation.
+		return Robot.isSimulation() ? motorSim.getSetpoint() : this.getAppliedOutput();
 	}
 
 	@Override
 	public double getLoggedVoltage() {
-		return motorSim.getBusVoltage();
+		return Robot.isSimulation()
+			? motorSim.getBusVoltage() : this.getAppliedOutput() * this.getBusVoltage();
 	}
 
 	@Override
 	public double getLoggedCurrent() {
-		return motorSim.getMotorCurrent();
+		return Robot.isSimulation() ? motorSim.getMotorCurrent() : this.getOutputCurrent();
 	}
 
 }
