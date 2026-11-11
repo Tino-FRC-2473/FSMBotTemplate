@@ -13,8 +13,11 @@ import frc.robot.subsystems.CommandSwerveDrivetrain;
  * abstraction; per-axis deadband, speed scaling, and all stop behavior are handled here.
  */
 public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveState> {
+	/** Drive output state reported once per tick. */
 	public enum DriveState {
+		/** No usable controller or every axis inside the deadband; zero demand is commanded. */
 		STOPPED,
+		/** A nonzero chassis demand is being commanded. */
 		DRIVING
 	}
 
@@ -51,6 +54,12 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	private final Config config;
 	private final InputMapper inputMapper;
 
+	/**
+	 * Create the drive FSM and immediately command a safe stopped state.
+	 * @param drivetrain drivetrain that owns the module outputs
+	 * @param config validated speed limits and deadband
+	 * @param inputMapper converts the teleop snapshot to normalized chassis demand
+	 */
 	public DrivetrainFSMSystem(
 		CommandSwerveDrivetrain drivetrain,
 		Config config,
@@ -70,20 +79,25 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 	@Override
 	public void update(Input input) {
 		drivetrain.updateOperatorPerspective();
-		if (input == null || !input.isDriverControllerConnected()) {
-			stop();
+		if (nextState(input) == DriveState.STOPPED) {
+			commandStop();
 			return;
 		}
 
 		DriveInput demand = inputMapper.apply(input);
 		if (demand == null) {
-			stop();
+			commandStop();
 			return;
 		}
 
 		double forward = applyDeadbandAndClamp(demand.forward(), config.deadband());
 		double left = applyDeadbandAndClamp(demand.left(), config.deadband());
 		double rotation = applyDeadbandAndClamp(demand.rotation(), config.deadband());
+		if (forward == 0.0 && left == 0.0 && rotation == 0.0) {
+			commandStop();
+			return;
+		}
+
 		drivetrain.driveFieldCentric(
 			forward * config.maxLinearSpeedMetersPerSecond(),
 			left * config.maxLinearSpeedMetersPerSecond(),
@@ -129,7 +143,7 @@ public class DrivetrainFSMSystem extends FSMSystem<DrivetrainFSMSystem.DriveStat
 			? DriveState.STOPPED : DriveState.DRIVING;
 	}
 
-	private void stop() {
+	private void commandStop() {
 		drivetrain.stop();
 		setCurrentState(DriveState.STOPPED);
 	}

@@ -122,6 +122,11 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	private double lastProcessedTimestampSeconds = Double.NEGATIVE_INFINITY;
 	private RejectionReason lastRejectionReason = RejectionReason.NO_TAGS;
 
+	/**
+	 * Create a vision FSM bound to a drivetrain's heading, yaw rate, and pose estimator.
+	 * @param drivetrain source of gyro heading and consumer of accepted measurements
+	 * @param config camera name, quality gates, and measurement noise
+	 */
 	public VisionFSMSystem(CommandSwerveDrivetrain drivetrain, Config config) {
 		this(
 			config,
@@ -130,6 +135,13 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 			drivetrain::addVisionMeasurement);
 	}
 
+	/**
+	 * Create a vision FSM with injected estimator seams so vision can be tested without CAN.
+	 * @param config camera name, quality gates, and measurement noise
+	 * @param robotRotationSupplier field-aligned robot rotation published for MegaTag2
+	 * @param angularVelocityDegreesPerSecondSupplier measured yaw rate in degrees per second
+	 * @param visionConsumer consumer for accepted poses and their standard deviations
+	 */
 	public VisionFSMSystem(
 		Config config,
 		Supplier<Rotation3d> robotRotationSupplier,
@@ -172,10 +184,18 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		return getCurrentState();
 	}
 
+	/**
+	 * Most recent rejection reason.
+	 * @return the last reason, or {@link RejectionReason#NONE} after a fused measurement
+	 */
 	public RejectionReason getLastRejectionReason() {
 		return lastRejectionReason;
 	}
 
+	/**
+	 * Publish orientation, read one MegaTag2 estimate, and fuse it when it passes validation.
+	 * Call at most once per loop; Robot owns the call because vision is not a shared mechanism.
+	 */
 	public void updateVision() {
 		Rotation3d robotRotation = robotRotationSupplier.get();
 		LimelightHelpers.SetRobotOrientation_NoFlush(

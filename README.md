@@ -40,7 +40,8 @@ import frc.robot.input.InputTypes.ButtonInput;
 import frc.robot.input.InputTypes.AxialInput;
 
 public void update(Input input) {
-    if (input != null && input.getButtonPressed(ButtonInput.INTAKE_BUTTON)) {
+    // Add your own logical input to InputTypes; DRIVETRAIN_RESEED is the only one shipped.
+    if (input != null && input.getButtonPressed(ButtonInput.DRIVETRAIN_RESEED)) {
         setCurrentState(IntakeFSMState.INTAKE_STATE);
     }
     // Run state output handlers in BOTH modes, including when input is null.
@@ -51,7 +52,7 @@ public void update(Input input) {
 
 Buttons already held at teleop entry or reconnect are suppressed (including their held value) until released; that release does not synthesize a release edge. A subsequent press works normally. Disconnected controllers have zero axes and false buttons, without artificial press/release edges. Axes resume at their current value on reconnect; there is no neutral-stick rearming. Nonfinite axes become zero and other values are clamped to [-1, 1]. Input does not apply drivetrain deadband a second time.
 
-**Mechanism disconnect behavior:** loss of the mechanism controller resets all registered mechanisms immediately and skips their teleop updates while disconnected. The driver remains independent. Reconnection resumes mechanism updates with held buttons suppressed until release. Safe output still depends on each FSM's reset implementation. Autonomous mechanism updates do not depend on either controller being connected.
+**Mechanism disconnect behavior:** loss of the mechanism controller resets all registered mechanisms immediately, then keeps ticking them with `null` input so sensor and timer transitions keep running from their safe states. The driver remains independent. Reconnection resumes controller input with held buttons suppressed until release. A mechanism that must not keep moving after a disconnect belongs in its `reset()`/null-input handling, not in a skipped update. Autonomous mechanism updates do not depend on either controller being connected.
 
 Bindings below expose logical actions only. Apart from drivetrain sticks and reseed, the template does not implement the corresponding robot features—you supply their FSM behavior.
 
@@ -60,21 +61,11 @@ Bindings below expose logical actions only. Apart from drivetrain sticks and res
 | Driver | Left Y (negated) | `DRIVETRAIN_DRIVE_X` — positive forward |
 | Driver | Left X (negated) | `DRIVETRAIN_DRIVE_Y` — positive left |
 | Driver | Right X (negated) | `DRIVETRAIN_ROTATE` — positive counterclockwise |
-| Driver | Start / Y / Back | `DRIVETRAIN_RESEED` / `DRIVETRAIN_PATHFIND` / `DRIVETRAIN_INVERT_CONTROLS` |
-| Driver | Left / right trigger | `FACE_PASS` / `FACE_HUB` |
-| Driver | X / A | `BALL_SHAKE_FRONT` / `BALL_SHAKE_SIDE` |
-| Mechanism | Left X | `CLIMBER_MANUAL_CONTROL` — positive right |
-| Mechanism | B / A | `INTAKE_BUTTON` / `OUTTAKE_BUTTON` |
-| Mechanism | Y / X / Start | `FOLD_IN_BUTTON` / `FOLD_OUT_BUTTON` / `PARTIAL_OUT_BUTTON` |
-| Mechanism | POV up / left / down | `CLIMBER_MANUAL_OVERRIDE` / `CLIMBER_NEXT_STEP` / `CLIMBER_EMERGENCY_ABORT` |
-| Mechanism | Right / left bumper | `PASSER_PREP_TOGGLE` / `MANUAL_SHOOT_TOGGLE` |
-| Mechanism | Left / right trigger | `SHOOTER_PREP_TOGGLE` / `REV_FEEDER` |
-| Mechanism | Back | `IDLE_SHOOTER_TOGGLE` |
-| Unbound | None | `CLIMBER_AUTO_UP_1`, `CLIMBER_AUTO_UP_2` |
+| Driver | Start | `DRIVETRAIN_RESEED` — reset field-centric forward |
 
-Trigger actions become true above 0.5. The drivetrain coordinate signs intentionally preserve this template's behavior rather than the raw signs of last season's input adapter.
+These are the only logical inputs defined in `InputTypes`. `TRIGGER_THRESHOLD` exists for trigger-backed buttons, but nothing binds a trigger yet. Add new inputs to `InputTypes` and bind them in `TeleopInput`; the table above previously listed robot-specific actions that were removed. The drivetrain coordinate signs intentionally preserve this template's behavior rather than the raw signs of last season's input adapter.
 
-**Migration:** mechanisms can keep `update(Input)`, `nextState(Input)`, `getCurrentState()`, public `setCurrentState()`, and their own enum names. Replace root-package `frc.robot.TeleopInput` imports with `frc.robot.input.Input` in FSMs. The controller-owning class now lives in `frc.robot.input`. Do not carry over `if (input == null) return;` from the old intake: it prevents autonomous outputs and reset outputs. For button-only transitions, null input should preserve the current state; sensor/timer transitions should remain available in either mode. `watchForStatesCommand()` from the old season base is not included in this input change.
+**Migration:** mechanisms implement `update(Input)` and can keep `nextState(Input)`, `getCurrentState()`, public `setCurrentState()`, and their own enum names. Replace root-package `frc.robot.TeleopInput` imports with `frc.robot.input.Input` in FSMs. The controller-owning class now lives in `frc.robot.input`. Do not carry over `if (input == null) return;` from the old intake: it prevents autonomous outputs and reset outputs. For button-only transitions, null input should preserve the current state; sensor/timer transitions should remain available in either mode. `watchForStatesCommand()` from the old season base is not included in this input change.
 
 ## Robot modes
 
@@ -125,7 +116,7 @@ intake.setState(IntakeFSMSystem.State.INTAKE);
 
 Loop ownership:
 
-- **Teleop:** Robot polls its teleop snapshot first, then calls each registered mechanism's `update(Input input)` once per loop while the mechanism controller is connected.
+- **Teleop:** Robot polls its teleop snapshot first, then calls each registered mechanism's `update(Input input)` once per loop. When the mechanism controller is disconnected the call still happens with `null` input, so sensor and timer transitions keep running.
 - **Autonomous:** PathPlanner processes commands/events first, then Robot calls each mechanism's `update(null)` once while the routine remains active. Null means no controller input, not an instruction to stop. State handlers must work without a controller; only controller-driven transitions require non-null input.
 - **Disabled/test:** moving mechanism handlers are not ticked. Lifecycle resets immediately apply their safe outputs.
 - Mechanisms implement WPILib `Subsystem` only to supply shared command requirements. Do not add a scheduler `periodic()` or default command that also ticks them; Robot already owns updates. The drivetrain and vision retain their dedicated lifecycle and must not be added to the mechanism list.

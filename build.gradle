@@ -82,6 +82,8 @@ test {
 
 javadoc {
     source = sourceSets.main.allJava
+    // Vendored Limelight Javadoc has upstream HTML-tag errors; keep it out of team docs.
+    exclude 'frc/robot/imported/LimelightHelpers.java'
 }
 
 // Simulation configuration (e.g. environment variables).

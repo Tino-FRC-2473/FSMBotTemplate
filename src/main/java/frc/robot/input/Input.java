@@ -19,26 +19,48 @@ public abstract class Input {
 	private boolean driverConnected;
 	private boolean mechanismConnected;
 
+	/**
+	 * Read a normalized axis value from the most recent sample.
+	 * @param key axis to read
+	 * @return value in [-1, 1], or zero when disconnected or the raw value was nonfinite
+	 */
 	public final double getAxisValue(AxialInput key) {
 		return axes[Objects.requireNonNull(key, "axis").ordinal()];
 	}
 
+	/**
+	 * Whether the button is currently held.
+	 * @param key button to read
+	 * @return true while the button is held
+	 */
 	public final boolean getButtonValue(ButtonInput key) {
 		return held[Objects.requireNonNull(key, "button").ordinal()];
 	}
 
+	/**
+	 * Whether the button went down since the previous sample. Does not consume the edge.
+	 * @param key button to read
+	 * @return true only during the sample after a rising edge
+	 */
 	public final boolean getButtonPressed(ButtonInput key) {
 		return pressed[Objects.requireNonNull(key, "button").ordinal()];
 	}
 
+	/**
+	 * Whether the button went up since the previous sample. Does not consume the edge.
+	 * @param key button to read
+	 * @return true only during the sample after a falling edge
+	 */
 	public final boolean getButtonReleased(ButtonInput key) {
 		return released[Objects.requireNonNull(key, "button").ordinal()];
 	}
 
+	/** Whether the driver controller is currently connected. */
 	public final boolean isDriverControllerConnected() {
 		return driverConnected;
 	}
 
+	/** Whether the mechanism controller is currently connected. */
 	public final boolean isMechanismControllerConnected() {
 		return mechanismConnected;
 	}

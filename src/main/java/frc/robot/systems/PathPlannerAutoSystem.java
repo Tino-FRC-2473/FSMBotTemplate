@@ -77,6 +77,8 @@ public final class PathPlannerAutoSystem {
 		if (activeCommand != null) {
 			autoTimer.restart();
 			try {
+				// Teleop disables the scheduler so stray commands cannot queue; re-arm it for auto.
+				CommandScheduler.getInstance().enable();
 				CommandScheduler.getInstance().schedule(activeCommand);
 				if (!activeCommand.isScheduled()) {
 					cancel();

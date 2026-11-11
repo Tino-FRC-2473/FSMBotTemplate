@@ -10,6 +10,7 @@ import org.littletonrobotics.junction.LoggedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
@@ -24,6 +25,7 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.input.Input;
 import frc.robot.input.InputTypes.ButtonInput;
 import frc.robot.input.TeleopInput;
+import frc.robot.motors.MotorManager;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.systems.DrivetrainFSMSystem;
 import frc.robot.systems.FSMSystem;
@@ -68,12 +70,6 @@ public class Robot extends LoggedRobot {
 		loggingConfigured = true;
 	}
 
-	// Hardware-free lifecycle tests can provide a chooser and cleanup callbacks.
-	Robot(PathPlannerAutoSystem autonomousSystem, TeleopInput input) {
-		this.autonomousSystem = autonomousSystem;
-		this.input = input;
-	}
-
 	@Override
 	public void robotInit() {
 		input = new TeleopInput();
@@ -86,8 +82,8 @@ public class Robot extends LoggedRobot {
 			initializeMechanisms();
 		} catch (RuntimeException error) {
 			mechanismFaulted = true;
-			reportInitializationFailure("Mechanism initialization failed: " + error);
-			cancelAutonomous();
+			report("Mechanism initialization failed: " + error);
+			cancelAutoAndReset();
 		} finally {
 			mechanismRegistrationClosed = true;
 		}
@@ -141,7 +137,7 @@ public class Robot extends LoggedRobot {
 					error.addSuppressed(closeError);
 				}
 			}
-			reportInitializationFailure(
+			report(
 				"Swerve drivetrain was not initialized. Replace the TunerConstants scaffold "
 					+ "with this robot's unmodified 2026 Phoenix Tuner X output and verify its generated "
 					+ "speed and module geometry. Details: " + error);
@@ -154,7 +150,7 @@ public class Robot extends LoggedRobot {
 			SmartDashboard.putBoolean("Auto/Ready", true);
 		} catch (Exception error) {
 			autonomousSystem = null;
-			reportInitializationFailure(
+			report(
 				"PathPlanner autonomous is unavailable; teleop remains available. Configure "
 					+ "pathplanner/settings.json and autos in the deploy directory. Details: " + error);
 		}
@@ -165,7 +161,7 @@ public class Robot extends LoggedRobot {
 				() -> new VisionFSMSystem(drivetrain, getVisionConfig()));
 		} catch (RuntimeException error) {
 			visionFSM = null;
-			reportOptionalVisionFailure(
+			report(
 				"Limelight vision was not initialized; drivetrain remains available. Details: " + error);
 		}
 	}
@@ -178,15 +174,8 @@ public class Robot extends LoggedRobot {
 		return enabled ? Objects.requireNonNull(visionFactory.get(), "visionFactory result") : null;
 	}
 
-	private void reportInitializationFailure(String message) {
-		if (RobotBase.isReal()) {
-			DriverStation.reportError(message, false);
-		} else {
-			DriverStation.reportWarning(message, false);
-		}
-	}
-
-	private void reportOptionalVisionFailure(String message) {
+	/** Report failures on hardware and warnings in simulation so desktop tests stay readable. */
+	private void report(String message) {
 		if (RobotBase.isReal()) {
 			DriverStation.reportError(message, false);
 		} else {
@@ -207,7 +196,7 @@ public class Robot extends LoggedRobot {
 
 	@Override
 	public void autonomousInit() {
-		cancelAutonomous();
+		cancelAutoAndReset();
 		if (drivetrainFSM != null) {
 			drivetrainFSM.reset();
 		}
@@ -218,8 +207,8 @@ public class Robot extends LoggedRobot {
 			try {
 				autonomousSystem.start();
 			} catch (RuntimeException error) {
-				cancelAutonomous();
-				reportInitializationFailure("PathPlanner auto failed to start: " + error);
+				cancelAutoAndReset();
+				report("PathPlanner auto failed to start: " + error);
 			}
 		}
 	}
@@ -239,7 +228,9 @@ public class Robot extends LoggedRobot {
 
 	@Override
 	public void teleopInit() {
-		cancelAutonomous();
+		cancelAutoAndReset();
+		// Teleop never ticks the scheduler; disabling it keeps a stray scheduled command visible.
+		CommandScheduler.getInstance().disable();
 		input.synchronize();
 		mechanismControllerWasConnected = input.isMechanismControllerConnected();
 		if (drivetrainFSM != null) {
@@ -260,22 +251,22 @@ public class Robot extends LoggedRobot {
 			drivetrainFSM.update(input);
 		}
 		boolean mechanismConnected = input.isMechanismControllerConnected();
-		if (mechanismConnected) {
-			updateMechanisms(input);
-		} else if (mechanismControllerWasConnected) {
+		if (mechanismControllerWasConnected && !mechanismConnected) {
 			try {
 				resetMechanisms();
 			} catch (RuntimeException error) {
-				reportInitializationFailure("Mechanism controller lost; reset failed: " + error);
+				report("Mechanism controller lost; reset failed: " + error);
 			}
 		}
+		// Keep ticking without input: sensor/timer transitions must survive a missing controller.
+		updateMechanisms(mechanismConnected ? input : null);
 		mechanismControllerWasConnected = mechanismConnected;
 		updateVisionSafely();
 	}
 
 	@Override
 	public void disabledInit() {
-		cancelAutonomous();
+		cancelAutoAndReset();
 		if (drivetrainFSM != null) {
 			drivetrainFSM.update(null);
 		}
@@ -291,7 +282,7 @@ public class Robot extends LoggedRobot {
 
 	@Override
 	public void testInit() {
-		cancelAutonomous();
+		cancelAutoAndReset();
 		if (drivetrainFSM != null) {
 			drivetrainFSM.reset();
 		}
@@ -313,17 +304,19 @@ public class Robot extends LoggedRobot {
 		if (drivetrain != null) {
 			field.setRobotPose(drivetrain.getPose());
 		}
+		MotorManager.update();
 	}
 
-	private void cancelAutonomous() {
+	/** Cancel the active auto and always leave shared mechanisms in their safe reset state. */
+	private void cancelAutoAndReset() {
 		if (autonomousSystem != null) {
 			autonomousSystem.cancel();
-		} else {
-			try {
-				resetMechanisms();
-			} catch (RuntimeException error) {
-				reportInitializationFailure("Mechanism cleanup failed: " + error);
-			}
+			return;
+		}
+		try {
+			resetMechanisms();
+		} catch (RuntimeException error) {
+			report("Mechanism cleanup failed: " + error);
 		}
 	}
 
@@ -334,11 +327,14 @@ public class Robot extends LoggedRobot {
 		try {
 			for (FSMSystem<?> mechanism : mechanisms) {
 				mechanism.update(mechanismInput);
+				Logger.recordOutput(
+					"Mechanism/" + mechanism.getClass().getSimpleName() + "/State",
+					String.valueOf(mechanism.getCurrentState()));
 			}
 		} catch (RuntimeException error) {
 			mechanismFaulted = true;
-			cancelAutonomous();
-			reportInitializationFailure(
+			cancelAutoAndReset();
+			report(
 				"Mechanism update failed; shared mechanisms stopped until robot code restarts: " + error);
 		}
 	}
@@ -369,7 +365,7 @@ public class Robot extends LoggedRobot {
 			visionFSM.updateVision();
 		} catch (RuntimeException error) {
 			visionFSM = null;
-			reportOptionalVisionFailure(
+			report(
 				"Limelight vision disabled after a runtime failure; drive remains available: " + error);
 		}
 	}
@@ -377,7 +373,7 @@ public class Robot extends LoggedRobot {
 	@Override
 	public void close() {
 		try {
-			cancelAutonomous();
+			cancelAutoAndReset();
 		} finally {
 			try {
 				if (drivetrain != null) {
