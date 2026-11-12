@@ -159,5 +159,3 @@ The existing GradleRIO Sim GUI/Driver Station and Phoenix swerve simulation are 
 
 - `./gradlew simulateJava` — desktop simulation (requires a valid generated Tuner file for simulated drivetrain operation).
 - `./gradlew test build` — test and build (Java 17).
-- On this Mac: `./gradlew build -Dorg.gradle.java.home="/Users/arnavshah/wpilib/2026/jdk"` — build and run the tests using the WPILib JDK.
-- Deploy only after replacing the placeholder `TunerConstants.java` with the correct robot-specific generated file and completing the physical checks above.
