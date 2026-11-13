@@ -98,9 +98,19 @@ never argues with the gyro.
 
 ## Failure handling
 
-`Robot.updateVisionSafely()` wraps `update(null)` in a try/catch. A runtime exception clears the
-reference for the rest of the boot cycle: vision stops, driving continues. Vision is never required
-to drive or to follow a path.
+`Robot.updateVisionSafely()` wraps `update(null)` in a try/catch. Vision is never required to drive
+or to follow a path.
+
+A read that throws is retried on the next loop rather than ending vision. NT4 can throw while
+decoding a value the camera just published (for example `java.nio.BufferUnderflowException`); that
+is transient and does not mean the camera is gone. The Driver Station reports the exception type and
+the throwing frame the first time a *new* failure appears. Only
+`Constants.VisionDefaults.MAX_CONSECUTIVE_READ_FAILURES` failures in a row (about 0.5 s at 50 Hz)
+disable vision for the rest of the boot cycle.
+
+If a `BufferUnderflowException` persists, the camera side is publishing something the client cannot
+decode: confirm the Limelight runs LLOS 2026.0 or later (LimelightHelpers v1.14 requires it) and that
+only one NT4 client/server pair is talking on the network.
 
 ## Pit checks
 

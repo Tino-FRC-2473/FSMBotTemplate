@@ -51,6 +51,8 @@ public class Robot extends LoggedRobot {
 	private boolean mechanismRegistrationClosed;
 	private boolean mechanismFaulted;
 	private boolean mechanismControllerWasConnected;
+	private int visionReadFailures;
+	private String lastVisionFailure = "";
 
 	/** Configure AdvantageKit logging before any robot devices are constructed. */
 	public Robot() {
@@ -381,12 +383,32 @@ public class Robot extends LoggedRobot {
 		}
 		try {
 			visionFSM.update(null);
+			visionReadFailures = 0;
 		} catch (RuntimeException error) {
-			visionFSM = null;
-			report(
-				"Limelight vision disabled after a runtime failure; drive remains available: "
-					+ error);
+			visionReadFailures++;
+			String detail = describeVisionFailure(error);
+			if (!detail.equals(lastVisionFailure)) {
+				lastVisionFailure = detail;
+				report("Limelight read failed; retrying next loop. " + detail);
+			}
+			if (visionReadFailures >= Constants.VisionDefaults.MAX_CONSECUTIVE_READ_FAILURES) {
+				visionFSM = null;
+				report(
+					"Limelight vision disabled after repeated read failures; drive remains "
+						+ "available: " + detail);
+			}
 		}
+	}
+
+	private static String describeVisionFailure(RuntimeException error) {
+		StackTraceElement[] trace = error.getStackTrace();
+		String type = error.getClass().getSimpleName();
+		if (trace.length == 0) {
+			return type;
+		}
+		StackTraceElement frame = trace[0];
+		return type + " at " + frame.getClassName() + "." + frame.getMethodName()
+			+ "(" + frame.getFileName() + ":" + frame.getLineNumber() + ")";
 	}
 
 	@Override

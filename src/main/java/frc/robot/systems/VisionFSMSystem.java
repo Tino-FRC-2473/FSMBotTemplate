@@ -192,6 +192,8 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 
 		LimelightHelpers.setPipelineIndex(config.limelightName(), config.aprilTagPipeline());
 		LimelightHelpers.setLEDMode_PipelineControl(config.limelightName());
+		LimelightHelpers.SetIMUMode(config.limelightName(), 3);
+		LimelightHelpers.SetIMUAssistAlpha(config.limelightName(), 0.01);
 		if (config.configureCameraPose()) {
 			Transform3d camera = config.robotToCamera();
 			LimelightHelpers.setCameraPose_RobotSpace(

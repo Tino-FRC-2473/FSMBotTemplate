@@ -45,6 +45,9 @@ public final class Constants {
 		public static final double MAX_FUTURE_TIMESTAMP_SECONDS = 0.05;
 		public static final double MAX_TAG_AMBIGUITY = 0.20;
 		public static final double MAX_AVERAGE_TAG_DISTANCE_METERS = 6.0;
+		// Camera reads can fail transiently while NT4 decodes a published value. Vision is only
+		// abandoned after this many consecutive failures (about 0.5 s at 50 Hz).
+		public static final int MAX_CONSECUTIVE_READ_FAILURES = 25;
 		// MegaTag2 uses supplied gyro heading; don't allow vision to override theta.
 		public static final Matrix<N3, N1> MEGATAG2_STD_DEVS = VecBuilder.fill(0.70, 0.70, 1.0e6);
 	}
