@@ -36,7 +36,7 @@ public class ExampleFSMSystem extends FSMSystem<FSMState> {
 	public ExampleFSMSystem() {
 		// Perform hardware init using a wrapper class
 		// this is so we can see motor outputs during simulatiuons
-		exampleMotor = new SparkMaxWrapper(HardwareMap.CAN_ID_SPARK_SHOOTER,
+		exampleMotor = new SparkMaxWrapper(HardwareMap.CAN_ID_SPARK_DRIVE_BACK_LEFT,
 										SparkMax.MotorType.kBrushless);
 
 		// Reset state machine
