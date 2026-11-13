@@ -34,6 +34,7 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	public enum RejectionReason {
 		NONE,
 		NO_TAGS,
+		DETECTED_NO_POSE,
 		INVALID_FIDUCIALS,
 		INVALID_POSE,
 		INVALID_TIMESTAMP,
@@ -222,9 +223,12 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 
 		PoseEstimate estimate =
 			LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.limelightName());
-		boolean fused = fuseIfValid(estimate);
+		// Distinguishes "the pipeline sees no tag" from "a tag is visible but MegaTag2
+		// produced no localization pose" (missing field map or robot-space pose).
+		boolean cameraHasTarget = LimelightHelpers.getTV(config.limelightName());
+		boolean fused = fuseIfValid(estimate, cameraHasTarget);
 		setCurrentState(nextState(input));
-		logResult(estimate, lastRejectionReason, fused);
+		logResult(estimate, lastRejectionReason, fused, cameraHasTarget);
 	}
 
 	@Override
@@ -245,8 +249,8 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	}
 
 	// A rejected frame still consumes its timestamp so the same frame is never retried.
-	private boolean fuseIfValid(PoseEstimate estimate) {
-		lastRejectionReason = validateIncoming(estimate);
+	private boolean fuseIfValid(PoseEstimate estimate, boolean cameraHasTarget) {
+		lastRejectionReason = validateIncoming(estimate, cameraHasTarget);
 		if (lastRejectionReason != RejectionReason.NONE) {
 			return false;
 		}
@@ -259,9 +263,9 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		return true;
 	}
 
-	private RejectionReason validateIncoming(PoseEstimate estimate) {
+	private RejectionReason validateIncoming(PoseEstimate estimate, boolean cameraHasTarget) {
 		if (estimate == null || estimate.tagCount <= 0) {
-			return RejectionReason.NO_TAGS;
+			return cameraHasTarget ? RejectionReason.DETECTED_NO_POSE : RejectionReason.NO_TAGS;
 		}
 		if (!Double.isFinite(estimate.timestampSeconds) || estimate.timestampSeconds <= 0.0) {
 			return RejectionReason.INVALID_TIMESTAMP;
@@ -343,10 +347,19 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 			&& timestampSeconds > previousTimestampSeconds;
 	}
 
-	private void logResult(PoseEstimate estimate, RejectionReason reason, boolean accepted) {
+	private void logResult(
+		PoseEstimate estimate, RejectionReason reason, boolean accepted, boolean cameraHasTarget) {
 		Logger.recordOutput("Vision/State", getCurrentState().toString());
 		Logger.recordOutput("Vision/Accepted", accepted);
 		Logger.recordOutput("Vision/RejectionReason", reason.toString());
+		Logger.recordOutput("Vision/Camera/HasTarget", cameraHasTarget);
+		Logger.recordOutput(
+			"Vision/Camera/TargetID", LimelightHelpers.getFiducialID(config.limelightName()));
+		Logger.recordOutput(
+			"Vision/Camera/Heartbeat", LimelightHelpers.getHeartbeat(config.limelightName()));
+		Logger.recordOutput(
+			"Vision/Camera/Pipeline",
+			LimelightHelpers.getCurrentPipelineIndex(config.limelightName()));
 		if (estimate != null) {
 			Logger.recordOutput("Vision/TagCount", estimate.tagCount);
 			Logger.recordOutput("Vision/TimestampSeconds", estimate.timestampSeconds);

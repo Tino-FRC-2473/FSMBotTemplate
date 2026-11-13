@@ -16,9 +16,9 @@ The state is a **diagnostic output**, not a goal. `nextState()` derives it from 
 
 | State | Meaning |
 | --- | --- |
-| `WAITING_FOR_TAGS` | No frame, or the frame contained no tags |
+| `WAITING_FOR_TAGS` | No frame, and the pipeline reports no target |
 | `TRACKING` | The last frame passed validation and was fused |
-| `REJECTING_ESTIMATE` | A frame arrived but failed a check |
+| `REJECTING_ESTIMATE` | A tag is visible or a frame arrived, but nothing usable came out of it |
 
 | `RejectionReason` | Resulting state |
 | --- | --- |
@@ -52,7 +52,8 @@ A frame is fused at most once.
 | Reason | Trigger |
 | --- | --- |
 | `NONE` | Accepted |
-| `NO_TAGS` | Estimate is null or `tagCount <= 0` |
+| `NO_TAGS` | Estimate is null or `tagCount <= 0`, and the pipeline reports no target (`tv` false) |
+| `DETECTED_NO_POSE` | Pipeline has a target (`tv` true) but MegaTag2 returned no pose — check the uploaded field map, the robot-space pose, and robot orientation |
 | `INVALID_FIDUCIALS` | `rawFiducials` missing, length mismatch, or a null/nonfinite entry |
 | `INVALID_POSE` | Pose null or nonfinite before transform, or after `poseTransform` |
 | `INVALID_TIMESTAMP` | Timestamp nonfinite or `<= 0` |
@@ -88,6 +89,12 @@ never argues with the gyro.
 
 - `Vision/State`, `Vision/Accepted`, `Vision/RejectionReason` — one record per loop.
 - `Vision/TagCount`, `Vision/TimestampSeconds`, `Vision/EstimatedPose` — from the frame, when present.
+- `Vision/Camera/HasTarget`, `Vision/Camera/TargetID`, `Vision/Camera/Heartbeat`,
+  `Vision/Camera/Pipeline` — raw camera state, read every loop. `HasTarget` is the pipeline's
+  `tv`; it is true whenever a tag is detected, independently of MegaTag2 localization output.
+  A flat `Heartbeat` means robot and camera are not talking (wrong `limelightName`, network).
+  It also shows the pipeline the camera reports as active, which is not necessarily the one the
+  robot requested.
 
 ## Failure handling
 

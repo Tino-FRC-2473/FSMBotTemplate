@@ -23,8 +23,8 @@ public final class Constants {
 		public static final double MAX_LINEAR_SPEED_SCALE = 1.0;
 
 		/** Set true only when this robot has a configured Limelight. */
-		public static final boolean ENABLE_LIMELIGHT_VISION = false;
-		public static final String LIMELIGHT_NAME = "limelight";
+		public static final boolean ENABLE_LIMELIGHT_VISION = true;
+		public static final String LIMELIGHT_NAME = "limelight-four";
 		public static final int APRILTAG_PIPELINE = 0;
 	}
 
