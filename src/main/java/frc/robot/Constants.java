@@ -17,4 +17,18 @@ public class Constants {
     public static final double PIVOT_MIN_ANGLE = 0;
     public static final double ELEVATOR_MAX_SPEED = 0;
     public static final double PIVOT_MAX_SPEED = 0;
+    // Hardware IDs (Change these to match your robot's wiring)
+ public static final int LEFT_FRICTION_BRAKE_PWM_CHANNEL = 0;
+    public static final int RIGHT_FRICTION_BRAKE_PWM_CHANNEL = 1;
+
+    // Servo positions (0.0 to 1.0) - adjust these to match your physical linkages
+    public static final double LEFT_BRAKE_ENGAGED_POS = 0.2;
+    public static final double LEFT_BRAKE_RELEASED_POS = 0.8;
+
+    // Note: The right servo may need inverted positions if mounted mirrored to the left
+    public static final double RIGHT_BRAKE_ENGAGED_POS = 0.8; 
+    public static final double RIGHT_BRAKE_RELEASED_POS = 0.2;
+
+    // Tolerance for knowing when the elevator has stopped
+    public static final double VELOCITY_STOP_TOLERANCE = 0.05; 
 }
