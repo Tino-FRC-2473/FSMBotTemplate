@@ -12,10 +12,16 @@ public final class HardwareMap {
 	public static final int CAN_ID_SPARK_DRIVE_BACK_RIGHT = 2;
 	public static final int CAN_ID_SPARK_DRIVE_FRONT_LEFT = 3;
 	public static final int CAN_ID_SPARK_DRIVE_BACK_LEFT = 4;
+	// Elevator
 	public static final int CAN_ID_ELEVATOR_UP_1 = 5;
 	public static final int CAN_ID_ELEVATOR_UP_2 = 6;
 	public static final int CAN_ID_ELEVATOR_PIVOT_1 = 7;
 	public static final int CAN_ID_ELEVATOR_PIVOT_2 = 8;
+	// Limit switches
+	public static final int ELEVATOR_UP_LIMIT_SWITCH = 9;
+	public static final int ELEVATOR_DOWN_LIMIT_SWITCH = 10;
+	public static final int ELEVATOR_RIGHT_LIMIT_SWITCH = 11;
+	public static final int ELEVATOR_LEFT_LIMIT_SWITCH = 12;
 
 	// Pneumatics channel numbers
 	public static final int PCM_CHANNEL_INTAKE_CYLINDER_FORWARD = 1;

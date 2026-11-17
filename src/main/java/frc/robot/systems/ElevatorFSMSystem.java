@@ -4,18 +4,17 @@ import static edu.wpi.first.units.Units.Inches;
 import static edu.wpi.first.units.Units.Radians;
 import static edu.wpi.first.units.Units.Volts;
 
-import org.ironmaple.simulation.motorsims.SimulatedBattery;
-
-// WPILib Imports
-
 // Third party Hardware Imports
 import org.littletonrobotics.junction.Logger;
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
-import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.GravityTypeValue;
+import com.ctre.phoenix6.signals.InvertedValue;
+import com.ctre.phoenix6.controls.Follower;
+import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 
@@ -27,11 +26,14 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.AngularAcceleration;
+import edu.wpi.first.units.measure.AngularVelocity;
+import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Distance;
+import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.ElevatorSim;
-import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.HardwareMap;
 import frc.robot.Robot;
 
@@ -57,12 +59,34 @@ public class ElevatorFSMSystem {
 	private ElevatorFSMState currentState;
 	private MotionMagicVoltage motionRequest;
 
+	private final StatusSignal<Angle> elevatorMotorUp1Pos;
+	private final StatusSignal<Angle> elevatorMotorUp2Pos;
+	private final StatusSignal<AngularVelocity> elevatorMotorUp1Vel;
+	private final StatusSignal<AngularVelocity> elevatorMotorUp2Vel;
+	private final StatusSignal<AngularAcceleration> elevatorMotorUp1Accel;
+	private final StatusSignal<AngularAcceleration> elevatorMotorUp2Accel;
+	private final StatusSignal<Voltage> elevatorMotorUp1Vol;
+	private final StatusSignal<Voltage> elevatorMotorUp2Vol;
+	private final StatusSignal<Current> elevatorMotorUp1Cur;
+	private final StatusSignal<Current> elevatorMotorUp2Cur;
+
+	private final StatusSignal<Angle> elevatorMotorPivot1Pos;
+	private final StatusSignal<Angle> elevatorMotorPivot2Pos;
+	private final StatusSignal<AngularVelocity> elevatorMotorPivot1Vel;
+	private final StatusSignal<AngularVelocity> elevatorMotorPivot2Vel;
+	private final StatusSignal<AngularAcceleration> elevatorMotorPivot1Accel;
+	private final StatusSignal<AngularAcceleration> elevatorMotorPivot2Accel;
+	private final StatusSignal<Voltage> elevatorMotorPivot1Vol;
+	private final StatusSignal<Voltage> elevatorMotorPivot2Vol;
+	private final StatusSignal<Current> elevatorMotorPivot1Cur;
+	private final StatusSignal<Current> elevatorMotorPivot2Cur;
+
 	// Hardware devices should be owned by one and only one system. They must
 	// be private to their owner system and may not be used elsewhere.
-	private TalonFX elevatorMotorUp1;
-	private TalonFX elevatorMotorUp2;
-	private TalonFX elevatorMotorPivot1;
-	private TalonFX elevatorMotorPivot2;
+	private TalonFXWrapper elevatorMotorUp1;
+	private TalonFXWrapper elevatorMotorUp2;
+	private TalonFXWrapper elevatorMotorPivot1;
+	private TalonFXWrapper elevatorMotorPivot2;
 
 	private DigitalInput elevatorUpLimitSwitch;
 	private DigitalInput elevatorDownLimitSwitch;
@@ -99,64 +123,147 @@ public class ElevatorFSMSystem {
 		elevatorMotorPivot1 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_1);
 		elevatorMotorPivot2 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_2);
 
-		motionRequest = new MotionMagicVoltage(0);
+		elevatorMotorUp1.setPosition(ElevatorConstants.ELEVATOR_LOWER_THRESHHOLD);
+		elevatorMotorUp2.setPosition(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD);
+		elevatorMotorPivot1.setPosition(0);
+		elevatorMotorPivot2.setPosition(0);
 
-		var talonFXConfigs = new TalonFXConfiguration();
+		// Get motor status signals
+		elevatorMotorUp1Pos = elevatorMotorUp1.getPosition();
+		elevatorMotorUp1Vel = elevatorMotorUp1.getVelocity();
+		elevatorMotorUp1Accel = elevatorMotorUp1.getAcceleration();
+		elevatorMotorUp1Cur = elevatorMotorUp1.getStatorCurrent();
+		elevatorMotorUp1Vol = elevatorMotorUp1.getMotorVoltage();
 
-		var outputConfigs = talonFXConfigs.MotorOutput;
-		outputConfigs.NeutralMode = NeutralModeValue.Brake;
+		elevatorMotorUp2Pos = elevatorMotorUp2.getPosition();
+		elevatorMotorUp2Vel = elevatorMotorUp2.getVelocity();
+		elevatorMotorUp2Accel = elevatorMotorUp2.getAcceleration();
+		elevatorMotorUp2Cur = elevatorMotorUp2.getStatorCurrent();
+		elevatorMotorUp2Vol = elevatorMotorUp2.getMotorVoltage();
 
-		// apply sw limit
-		var swLimitSwitch = talonFXConfigs.SoftwareLimitSwitch;
-		swLimitSwitch.ForwardSoftLimitEnable = true; // enable top limit
-		swLimitSwitch.ReverseSoftLimitEnable = true; // enable bottom limit
-		swLimitSwitch.ForwardSoftLimitThreshold = ElevatorConstants.ELEVATOR_UPPER_THRESHOLD;
-		swLimitSwitch.ReverseSoftLimitThreshold = Inches.of(0).in(Inches);
+		elevatorMotorPivot1Pos = elevatorMotorPivot1.getPosition();
+		elevatorMotorPivot1Vel = elevatorMotorPivot1.getVelocity();
+		elevatorMotorPivot1Accel = elevatorMotorPivot1.getAcceleration();
+		elevatorMotorPivot1Cur = elevatorMotorPivot1.getStatorCurrent();
+		elevatorMotorPivot1Vol = elevatorMotorPivot1.getMotorVoltage();
 
-		var sensorConfig = talonFXConfigs.Feedback;
-		sensorConfig.SensorToMechanismRatio = ElevatorConstants.ELEVATOR_ROTS_TO_INCHES;
+		elevatorMotorPivot2Pos = elevatorMotorPivot2.getPosition();
+		elevatorMotorPivot2Vel = elevatorMotorPivot2.getVelocity();
+		elevatorMotorPivot2Accel = elevatorMotorPivot2.getAcceleration();
+		elevatorMotorPivot2Cur = elevatorMotorPivot2.getStatorCurrent();
+		elevatorMotorPivot2Vol = elevatorMotorPivot2.getMotorVoltage();
 
-		var slot0Configs = talonFXConfigs.Slot0;
-		slot0Configs.GravityType = GravityTypeValue.Elevator_Static;
-		slot0Configs.kG = ElevatorConstants.ELEVATOR_KG;
-		slot0Configs.kS = ElevatorConstants.ELEVATOR_KS;
-		slot0Configs.kV = ElevatorConstants.ELEVATOR_KV;
-		slot0Configs.kA = ElevatorConstants.ELEVATOR_KA;
-		slot0Configs.kP = ElevatorConstants.ELEVATOR_KP;
-		slot0Configs.kI = ElevatorConstants.ELEVATOR_KI;
-		slot0Configs.kD = ElevatorConstants.ELEVATOR_KD;
-		slot0Configs.StaticFeedforwardSign = StaticFeedforwardSignValue.UseClosedLoopSign;
+		// Initialize TalonFX configurations
+		var elevatorUpConfigs = new TalonFXConfiguration();
+		var elevatorPivotConfigs = new TalonFXConfiguration();
 
-		var motionMagicConfigs = talonFXConfigs.MotionMagic;
-		motionMagicConfigs.MotionMagicCruiseVelocity = ElevatorConstants.ELEVATOR_CRUISE_VELO;
-		motionMagicConfigs.MotionMagicAcceleration = ElevatorConstants.ELEVATOR_TARGET_ACCEL;
-		motionMagicConfigs.MotionMagicExpo_kV = ElevatorConstants.ELEVATOR_EXPO_KV;
+		// Configure follower motors
+		elevatorMotorUp2.setControl(new Follower(elevatorMotorUp1.getDeviceID(),
+			MotorAlignmentValue.Opposed));
 
-		elevatorMotorUp1.getConfigurator().apply(talonFXConfigs);
+		elevatorMotorPivot2.setControl(new Follower(elevatorMotorPivot1.getDeviceID(),
+			MotorAlignmentValue.Opposed));
 
+		// Configure elevator up motors
+		var elevatorUpFeedback = elevatorUpConfigs.Feedback;
+		elevatorUpFeedback.SensorToMechanismRatio = ElevatorConstants.ELEVATOR_GEARING;
+
+		var elevatorUpLimits = elevatorUpConfigs.CurrentLimits;
+		elevatorUpLimits.StatorCurrentLimit = ElevatorConstants.ELEVATOR_CURRENT_LIMIT;
+		elevatorUpLimits.StatorCurrentLimitEnable = true;
+
+		var elevatorUpOutput = elevatorUpConfigs.MotorOutput;
+		elevatorUpOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+
+		var elevatorUpSlot0 = elevatorUpConfigs.Slot0;
+		elevatorUpSlot0.kS = ElevatorConstants.ELEVATOR_KS;
+		elevatorUpSlot0.kV = ElevatorConstants.ELEVATOR_KV;
+		elevatorUpSlot0.kA = ElevatorConstants.ELEVATOR_KA;
+		elevatorUpSlot0.kP = ElevatorConstants.ELEVATOR_KP;
+		elevatorUpSlot0.kI = ElevatorConstants.ELEVATOR_KI;
+		elevatorUpSlot0.kD = ElevatorConstants.ELEVATOR_KD;
+
+		var elevatorUpMotionMagic = elevatorUpConfigs.MotionMagic;
+		elevatorUpMotionMagic.MotionMagicCruiseVelocity = ElevatorConstants.ELEVATOR_CRUISE_VELO;
+		elevatorUpMotionMagic.MotionMagicAcceleration = ElevatorConstants.ELEVATOR_TARGET_ACCEL;
+		elevatorUpMotionMagic.MotionMagicExpo_kV = ElevatorConstants.ELEVATOR_EXPO_KV;
+
+		// Configure elevator pivot motors
+		var elevatorPivotFeedback = elevatorPivotConfigs.Feedback;
+		elevatorPivotFeedback.SensorToMechanismRatio = ElevatorConstants.PIVOT_GEARING;
+
+		var elevatorPivotLimits = elevatorPivotConfigs.CurrentLimits;
+		elevatorPivotLimits.StatorCurrentLimit = ElevatorConstants.PIVOT_CURRENT_LIMIT;
+		elevatorPivotLimits.StatorCurrentLimitEnable = true;
+
+		var elevatorPivotOutput = elevatorPivotConfigs.MotorOutput;
+		elevatorPivotOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+
+		var elevatorPivotSlot0 = elevatorPivotConfigs.Slot0;
+		elevatorPivotSlot0.kS = ElevatorConstants.PIVOT_KS;
+		elevatorPivotSlot0.kV = ElevatorConstants.PIVOT_KV;
+		elevatorPivotSlot0.kA = ElevatorConstants.PIVOT_KA;
+		elevatorPivotSlot0.kP = ElevatorConstants.PIVOT_KP;
+		elevatorPivotSlot0.kI = ElevatorConstants.PIVOT_KI;
+		elevatorPivotSlot0.kD = ElevatorConstants.PIVOT_KD;
+
+		var elevatorPivotMotionMagic = elevatorPivotConfigs.MotionMagic;
+		elevatorPivotMotionMagic.MotionMagicCruiseVelocity = ElevatorConstants.PIVOT_CRUISE_VELO;
+		elevatorPivotMotionMagic.MotionMagicAcceleration = ElevatorConstants.PIVOT_TARGET_ACCEL;
+		elevatorPivotMotionMagic.MotionMagicExpo_kV = ElevatorConstants.PIVOT_EXPO_KV;
+
+		// Apply elevator configurations
+		elevatorMotorUp1.getConfigurator().apply(elevatorUpConfigs);
 		BaseStatusSignal.setUpdateFrequencyForAll(
-				ElevatorConstants.UPDATE_FREQUENCY_HZ,
-				elevatorMotorUp1.getPosition(),
-				elevatorMotorUp1.getVelocity(),
-				elevatorMotorUp1.getAcceleration(),
-				elevatorMotorUp1.getMotorVoltage(),
-				elevatorMotorUp1.getRotorPosition(),
-				elevatorMotorUp1.getRotorVelocity()
+			ElevatorConstants.UPDATE_FREQUENCY,
+			elevatorMotorUp1Pos,
+			elevatorMotorUp1Vel,
+			elevatorMotorUp1Accel,
+			elevatorMotorUp1Cur,
+			elevatorMotorUp1Vol
 		);
-
 		elevatorMotorUp1.optimizeBusUtilization();
-			// MUST set brake after applying other configs
 
-		// Initialize limit switch
-		elevatorDownLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_UP_1);
-		elevatorUpLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_UP_2);
-		elevatorLeftLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_PIVOT_1);
-		elevatorRightLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_PIVOT_2);
+		elevatorMotorUp2.getConfigurator().apply(elevatorUpConfigs);
+		BaseStatusSignal.setUpdateFrequencyForAll(
+			ElevatorConstants.UPDATE_FREQUENCY,
+			elevatorMotorUp2Pos,
+			elevatorMotorUp2Vel,
+			elevatorMotorUp2Accel,
+			elevatorMotorUp2Cur,
+			elevatorMotorUp2Vol
+		);
+		elevatorMotorUp2.optimizeBusUtilization();
+
+		elevatorMotorPivot1.getConfigurator().apply(elevatorPivotConfigs);
+		BaseStatusSignal.setUpdateFrequencyForAll(
+			ElevatorConstants.UPDATE_FREQUENCY,
+			elevatorMotorPivot1Pos,
+			elevatorMotorPivot1Vel,
+			elevatorMotorPivot1Accel,
+			elevatorMotorPivot1Cur,
+			elevatorMotorPivot1Vol
+		);
+		elevatorMotorPivot1.optimizeBusUtilization();
+
+		elevatorMotorPivot2.getConfigurator().apply(elevatorPivotConfigs);
+		BaseStatusSignal.setUpdateFrequencyForAll(
+			ElevatorConstants.UPDATE_FREQUENCY,
+			elevatorMotorPivot2Pos,
+			elevatorMotorPivot2Vel,
+			elevatorMotorPivot2Accel,
+			elevatorMotorPivot2Cur,
+			elevatorMotorPivot2Vol
+		);
+		elevatorMotorPivot2.optimizeBusUtilization();
+
+		// Initialize limit switches
+		elevatorUpLimitSwitch = new DigitalInput(HardwareMap.ELEVATOR_UP_LIMIT_SWITCH);
+		elevatorDownLimitSwitch = new DigitalInput(HardwareMap.ELEVATOR_DOWN_LIMIT_SWITCH);
+		elevatorRightLimitSwitch = new DigitalInput(HardwareMap.ELEVATOR_RIGHT_LIMIT_SWITCH);
+		elevatorLeftLimitSwitch = new DigitalInput(HardwareMap.ELEVATOR_LEFT_LIMIT_SWITCH);
 
 		// Reset state machine
-
-		elevatorMotorUp1.setPosition(0);
-
 		reset();
 	}
 

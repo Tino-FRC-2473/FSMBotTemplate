@@ -6,12 +6,35 @@ public class Constants {
 		public static final double ELEVATOR_LOWER_THRESHHOLD = 0;
 		public static final double MAX_PIVOT_OUT = 0;
 		public static final double MAX_PIVOT_IN = 0;
-		public static final double ELEVATOR_GEAR_RATIO = 25.0;
-		public static final double PIVOT_GEAR_RATIO = 0;
 		public static final double PIVOT_MAX_ANGLE = 30.0;
-		public static final double PIVOT_MIN_ANGLE = 0;
-		public static final double ELEVATOR_MAX_SPEED = 0;
-		public static final double PIVOT_MAX_SPEED = 0;
+		public static final double PIVOT_MIN_ANGLE = -30.0;
+
+		// Elevator PID Constants
+		public static final double ELEVATOR_KS = 0;
+		public static final double ELEVATOR_KV = 0;
+		public static final double ELEVATOR_KA = 0;
+		public static final double ELEVATOR_KP = 0;
+		public static final double ELEVATOR_KI = 0;
+		public static final double ELEVATOR_KD = 0;
+		public static final double ELEVATOR_GEARING = 0;
+		public static final double ELEVATOR_CURRENT_LIMIT = 0;
+		public static final double ELEVATOR_CRUISE_VELO = 0;
+		public static final double ELEVATOR_TARGET_ACCEL = 0;
+		public static final double ELEVATOR_EXPO_KV = 0;
+
+		// Pivot PID Constants
+		public static final double PIVOT_KS = 0;
+		public static final double PIVOT_KV = 0;
+		public static final double PIVOT_KA = 0;
+		public static final double PIVOT_KP = 0;
+		public static final double PIVOT_KI = 0;
+		public static final double PIVOT_KD = 0;
+		public static final double PIVOT_GEARING = 0;
+		public static final double PIVOT_CURRENT_LIMIT = 0;
+		public static final double PIVOT_CRUISE_VELO = 0;
+		public static final double PIVOT_TARGET_ACCEL = 0;
+		public static final double PIVOT_EXPO_KV = 0;
+
 		// Hardware IDs (Change these to match your robot's wiring)
 		public static final int LEFT_FRICTION_BRAKE_PWM_CHANNEL = 0;
 		public static final int RIGHT_FRICTION_BRAKE_PWM_CHANNEL = 1;
@@ -26,5 +49,7 @@ public class Constants {
 
 		// Tolerance for knowing when the elevator has stopped
 		public static final double VELOCITY_STOP_TOLERANCE = 0.05;
+
+		public static final double UPDATE_FREQUENCY = 100;
 	}
 }
