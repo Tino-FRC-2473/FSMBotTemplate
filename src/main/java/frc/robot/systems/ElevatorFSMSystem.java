@@ -59,10 +59,15 @@ public class ElevatorFSMSystem {
 
 	// Hardware devices should be owned by one and only one system. They must
 	// be private to their owner system and may not be used elsewhere.
-	private TalonFX elevatorMotor1;
-	private TalonFX elevatorMotor2;
+	private TalonFX elevatorMotorUp1;
+	private TalonFX elevatorMotorUp2;
+	private TalonFX elevatorMotorPivot1;
+	private TalonFX elevatorMotorPivot2;
 
-	private DigitalInput groundLimitSwitch;
+	private DigitalInput elevatorUpLimitSwitch;
+	private DigitalInput elevatorDownLimitSwitch;
+	private DigitalInput elevatorRightLimitSwitch;
+	private DigitalInput elevatorLeftLimitSwitch;
 
 	private final DCMotor gearbox = DCMotor.getKrakenX60(1);
 
@@ -76,7 +81,7 @@ public class ElevatorFSMSystem {
 		elevatorSystem,
 		gearbox,
 		0,
-		Units.inchesToMeters(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD.in(Inches)),
+		Units.inchesToMeters(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD),
 		true,
 		0);
 
@@ -89,8 +94,10 @@ public class ElevatorFSMSystem {
 	 */
 	public ElevatorFSMSystem() {
 		// Perform hardware init
-		elevatorMotor1 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_1);
-		elevatorMotor2 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_2);
+		elevatorMotorUp1 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_1);
+		elevatorMotorUp2 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_2);
+		elevatorMotorPivot1 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_1);
+		elevatorMotorPivot2 = new TalonFXWrapper(HardwareMap.CAN_ID_ELEVATOR_UP_2);
 
 		motionRequest = new MotionMagicVoltage(0);
 
@@ -103,8 +110,7 @@ public class ElevatorFSMSystem {
 		var swLimitSwitch = talonFXConfigs.SoftwareLimitSwitch;
 		swLimitSwitch.ForwardSoftLimitEnable = true; // enable top limit
 		swLimitSwitch.ReverseSoftLimitEnable = true; // enable bottom limit
-		swLimitSwitch.ForwardSoftLimitThreshold = ElevatorConstants.ELEVATOR_UPPER_THRESHOLD
-			.in(Inches);
+		swLimitSwitch.ForwardSoftLimitThreshold = ElevatorConstants.ELEVATOR_UPPER_THRESHOLD;
 		swLimitSwitch.ReverseSoftLimitThreshold = Inches.of(0).in(Inches);
 
 		var sensorConfig = talonFXConfigs.Feedback;
@@ -126,27 +132,30 @@ public class ElevatorFSMSystem {
 		motionMagicConfigs.MotionMagicAcceleration = ElevatorConstants.ELEVATOR_TARGET_ACCEL;
 		motionMagicConfigs.MotionMagicExpo_kV = ElevatorConstants.ELEVATOR_EXPO_KV;
 
-		elevatorMotor1.getConfigurator().apply(talonFXConfigs);
+		elevatorMotorUp1.getConfigurator().apply(talonFXConfigs);
 
 		BaseStatusSignal.setUpdateFrequencyForAll(
 				ElevatorConstants.UPDATE_FREQUENCY_HZ,
-				elevatorMotor1.getPosition(),
-				elevatorMotor1.getVelocity(),
-				elevatorMotor1.getAcceleration(),
-				elevatorMotor1.getMotorVoltage(),
-				elevatorMotor1.getRotorPosition(),
-				elevatorMotor1.getRotorVelocity()
+				elevatorMotorUp1.getPosition(),
+				elevatorMotorUp1.getVelocity(),
+				elevatorMotorUp1.getAcceleration(),
+				elevatorMotorUp1.getMotorVoltage(),
+				elevatorMotorUp1.getRotorPosition(),
+				elevatorMotorUp1.getRotorVelocity()
 		);
 
-		elevatorMotor1.optimizeBusUtilization();
+		elevatorMotorUp1.optimizeBusUtilization();
 			// MUST set brake after applying other configs
 
 		// Initialize limit switch
-		groundLimitSwitch = new DigitalInput(HardwareMap.ELEVATOR_GROUND_LIMIT_SWITCH_DIO_PORT);
+		elevatorDownLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_UP_1);
+		elevatorUpLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_UP_2);
+		elevatorLeftLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_PIVOT_1);
+		elevatorRightLimitSwitch = new DigitalInput(HardwareMap.CAN_ID_ELEVATOR_PIVOT_2);
 
 		// Reset state machine
 
-		elevatorMotor1.setPosition(0);
+		elevatorMotorUp1.setPosition(0);
 
 		reset();
 	}
@@ -170,7 +179,7 @@ public class ElevatorFSMSystem {
 	 * Ex. if the robot is enabled, disabled, then reenabled.
 	 */
 	public void reset() {
-		currentState = ElevatorFSMState.MANUAL;
+		currentState = ElevatorFSMState.HOLD;
 
 		// Call one tick of update to ensure outputs reflect start state
 		update(null);
@@ -196,16 +205,16 @@ public class ElevatorFSMSystem {
 			// 	elevatorSim.getVelocityMetersPerSecond()
 			// 	/ Units.inchesToMeters(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD.in(Inches));
 			Logger.recordOutput("part way up", partOfWayUp);
-			((TalonFXWrapper) elevatorMotor1).setRawPosition(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD
+			((TalonFXWrapper) elevatorMotorUp1).setRawPosition(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD
 				.in(Inches) * partOfWayUp);
-			// elevatorMotor1.getSimState()
+			// elevatorMotorUp1.getSimState()
 			//.setRotorVelocity(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD.in(Inches)
 			//* partOfWayUpPerSecond);
 
 		}
 
-		elevatorSim.setInputVoltage(elevatorMotor1.get() * SimConstants.BATTERY_VOLTAGE);
-		Logger.recordOutput("elevator setpoint", elevatorMotor1.get());
+		elevatorSim.setInputVoltage(elevatorMotorUp1.get() * SimConstants.BATTERY_VOLTAGE);
+		Logger.recordOutput("elevator setpoint", elevatorMotorUp1.get());
 		Logger.recordOutput("simulated battery", SimulatedBattery.getBatteryVoltage().in(Volts));
 		elevatorSim.update(ElevatorConstants.UPDATE_PERIOD_SECS);
 
@@ -225,15 +234,15 @@ public class ElevatorFSMSystem {
 	 * Updates the logging information for the elevator system.
 	 */
 	public void updateLogging() {
-		Logger.recordOutput("Elevator encoder", elevatorMotor1.getPosition().getValueAsDouble());
-		Logger.recordOutput("Elevator velocity", elevatorMotor1.getVelocity().getValueAsDouble());
+		Logger.recordOutput("Elevator encoder", elevatorMotorUp1.getPosition().getValueAsDouble());
+		Logger.recordOutput("Elevator velocity", elevatorMotorUp1.getVelocity().getValueAsDouble());
 
 		Logger.recordOutput("Elevator bottom limit switch pressed", isBottomLimitReached());
 
 		Logger.recordOutput("Elevator State", currentState.toString());
-		Logger.recordOutput("Elevator Voltage", elevatorMotor1.getMotorVoltage().getValueAsDouble());
+		Logger.recordOutput("Elevator Voltage", elevatorMotorUp1.getMotorVoltage().getValueAsDouble());
 
-		Logger.recordOutput("Elevator Accel", elevatorMotor1.getAcceleration().getValueAsDouble());
+		Logger.recordOutput("Elevator Accel", elevatorMotorUp1.getAcceleration().getValueAsDouble());
 
 		Logger.recordOutput("Elev Inrage GRND?", inRange(getElevatorpos(),
 			ElevatorConstants.ELEVATOR_TARGET_GROUND));
@@ -241,8 +250,8 @@ public class ElevatorFSMSystem {
 		Logger.recordOutput("Elev Inrage L4?", inRange(getElevatorpos(),
 			ElevatorConstants.ELEVATOR_TARGET_L4));
 
-		Logger.recordOutput("ROTR POS", elevatorMotor1.getRotorPosition().getValueAsDouble());
-		Logger.recordOutput("ROTR VELO", elevatorMotor1.getRotorVelocity().getValueAsDouble());
+		Logger.recordOutput("ROTR POS", elevatorMotorUp1.getRotorPosition().getValueAsDouble());
+		Logger.recordOutput("ROTR VELO", elevatorMotorUp1.getRotorVelocity().getValueAsDouble());
 
 		// telemetry and logging
 		MechLogging.getInstance().updateElevatorPose3d(Angle.ofBaseUnits(
@@ -332,7 +341,7 @@ public class ElevatorFSMSystem {
 	 */
 	private boolean isBottomLimitReached() {
 		if (Robot.isSimulation()) {
-			return elevatorMotor1.getPosition().getValueAsDouble()
+			return elevatorMotorUp1.getPosition().getValueAsDouble()
 				< ElevatorConstants.ELEVATOR_INRANGE_VALUE.in(Inches);
 		}
 		return groundLimitSwitch.get(); // switch is normally open
@@ -344,7 +353,7 @@ public class ElevatorFSMSystem {
 	}
 
 	private Distance getElevatorpos() {
-		return Inches.of(elevatorMotor1.getPosition().getValueAsDouble());
+		return Inches.of(elevatorMotorUp1.getPosition().getValueAsDouble());
 	}
 
 	/* ------------------------ FSM state handlers ------------------------ */
@@ -359,18 +368,18 @@ public class ElevatorFSMSystem {
 		signalInput = MathUtil.applyDeadband(signalInput,
 			ElevatorConstants.ELEVATOR_JOYSTICK_INPUT_DEADBAND);
 		if (isBottomLimitReached()) {
-			elevatorMotor1.setPosition(0);
+			elevatorMotorUp1.setPosition(0);
 			if (signalInput < 0) {
-				elevatorMotor1.set(0); //don't go even further down if you hit the lower limit!
+				elevatorMotorUp1.set(0); //don't go even further down if you hit the lower limit!
 				return;
 			}
 		}
 
-		if (signalInput == 0 && elevatorMotor1.getPosition().getValueAsDouble()
+		if (signalInput == 0 && elevatorMotorUp1.getPosition().getValueAsDouble()
 			> ElevatorConstants.KG_CHECK.in(Inches)) {
-			elevatorMotor1.setControl(new VoltageOut(ElevatorConstants.ELEVATOR_KG));
+			elevatorMotorUp1.setControl(new VoltageOut(ElevatorConstants.ELEVATOR_KG));
 		} else {
-			elevatorMotor1.set(signalInput * ElevatorConstants.ELEVATOR_MANUAL_SCALE);
+			elevatorMotorUp1.set(signalInput * ElevatorConstants.ELEVATOR_MANUAL_SCALE);
 		}
 	}
 
@@ -381,9 +390,9 @@ public class ElevatorFSMSystem {
 	 */
 	private void handleGroundState(TeleopInput input) {
 		if (isBottomLimitReached()) {
-			elevatorMotor1.setPosition(0);
+			elevatorMotorUp1.setPosition(0);
 		} else {
-			elevatorMotor1.setControl(
+			elevatorMotorUp1.setControl(
 				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_GROUND.in(Inches))
 			);
 		}
@@ -395,7 +404,7 @@ public class ElevatorFSMSystem {
 	 *        the robot is in autonomous mode.
 	 */
 	private void handleL2State(TeleopInput input) {
-		elevatorMotor1.setControl(
+		elevatorMotorUp1.setControl(
 			motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L2.in(Inches))
 		);
 	}
@@ -406,7 +415,7 @@ public class ElevatorFSMSystem {
 	 *        the robot is in autonomous mode.
 	 */
 	private void handleL3State(TeleopInput input) {
-		elevatorMotor1.setControl(
+		elevatorMotorUp1.setControl(
 				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L3.in(Inches))
 		);
 	}
@@ -417,7 +426,7 @@ public class ElevatorFSMSystem {
 	 *        the robot is in autonomous mode.
 	 */
 	private void handleL4State(TeleopInput input) {
-		elevatorMotor1.setControl(
+		elevatorMotorUp1.setControl(
 				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L4.in(Inches))
 		);
 	}
@@ -462,7 +471,7 @@ public class ElevatorFSMSystem {
 
 		@Override
 		public void execute() {
-			elevatorMotor1.setControl(
+			elevatorMotorUp1.setControl(
 				motionRequest.withPosition(target.in(Inches))
 			);
 		}
