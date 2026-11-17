@@ -30,10 +30,11 @@ The state is a **diagnostic output**, not a goal. `nextState()` derives it from 
 
 1. Publish orientation with `SetRobotOrientation_NoFlush`: estimator heading, measured yaw rate,
    and Pigeon roll/pitch. MegaTag2 needs this before the frame is read.
-2. Read one `botpose_orb_wpiblue` estimate.
+2. Read `botpose_orb_wpiblue` (MegaTag2) and `botpose_wpiblue` (tag-only) for the same frame.
 3. `validateIncoming`: null/no tags, invalid timestamp, duplicate timestamp (in that order), then
    **consume the timestamp** and run `validateEstimate`.
-4. `fuseIfValid`: apply `poseTransform`, reject a null or nonfinite result, then hand the pose and
+4. `fuseIfValid`: apply `poseTransform`, reject a null or nonfinite result, then either seed the
+   drivetrain pose (first frame that also passes the seed-quality gate) or hand the clamped pose and
    standard deviations to the drivetrain's `addVisionMeasurement`.
 5. `setCurrentState(nextState(...))`, then log once.
 
@@ -46,6 +47,8 @@ A frame is fused at most once.
   on a later loop. This is deliberate: retrying would make a stale estimate look fresh.
 - `reset()` preserves the last timestamp, so a mode change cannot re-fuse a frame that was already
   applied.
+- The fused timestamp is clamped to `now - FUSE_MARGIN_SECONDS` at the latest, because the estimator
+  silently drops a measurement newer than its newest odometry sample.
 
 ## Rejection reasons
 
@@ -63,6 +66,38 @@ A frame is fused at most once.
 | `OUT_OF_FIELD` | Outside `fieldBounds` when bounds are configured |
 | `TOO_FAR` | `avgTagDist` nonfinite, negative, or beyond `maxAverageTagDistanceMeters` |
 | `HIGH_AMBIGUITY` | No tag at or below `maxTagAmbiguity` |
+
+## Seeding
+
+Filtering alone cannot localize the robot. The estimator keeps an odometry-only pose that starts at
+the boot position and applies vision as compensation on top of it, so any discarded compensation —
+a pose or rotation reset, or a measurement the estimator itself drops — reveals `0,0` again. The
+first frame that passes validation **and** the seed-quality gate therefore calls
+`CommandSwerveDrivetrain.seedPoseFromVision`, which calls `resetPose`. The odometry track itself
+moves into field coordinates, so losing the tag, a mode change, or a Start press can no longer
+return the pose to `0,0`.
+
+Seed quality is `tagCount >= MIN_SEED_TAGS`, or `avgTagDist <= MAX_SEED_TAG_DISTANCE_METERS` for a
+single tag. `localized` records that a seed happened; `reset()` preserves it, and the seed count, the
+same way it preserves the last timestamp. Every later frame fuses through `addVisionMeasurement` as
+before.
+
+## Heading
+
+MegaTag2 solves its position using the heading published in step 1, so the rotation it reports is the
+robot's own estimate coming back: fusing that theta cannot move yaw. The tag-only `botpose_wpiblue`
+pose is solved from tag geometry and is independent, so its rotation is mixed with the MegaTag2
+translation to form one measurement per frame.
+
+That substitution happens only while the tag-only fix is trustworthy — the same `isSeedQualitySufficient`
+gate used for seeding, plus passing `validateEstimate` (freshness, ambiguity, distance, field bounds).
+When it fails, the frame keeps the gyro heading and the huge theta standard deviation. When it holds,
+theta fuses at `HEADING_STD_DEV_RADIANS`, so heading is corrected over several frames instead of
+teleporting, and the first such frame also seeds the pose with the tag-derived heading.
+
+Tag-only heading depends on the camera's robot-space pose (mounting transform) being correct: set it
+in the Limelight web UI or enable `configureCameraPose` with the measured transform. A wrong transform
+appears as a constant yaw bias that fusion cannot remove.
 
 ## Configuration
 
@@ -82,12 +117,18 @@ A frame is fused at most once.
 | `measurementStdDevs` | `(0.70, 0.70, 1e6)` | x/y trusted, heading not |
 | `poseTransform` | identity | optional coordinate change |
 
-MegaTag2 supplies its own heading, so theta standard deviation is effectively infinite: vision
-never argues with the gyro.
+MegaTag2 supplies its own heading, so theta standard deviation is effectively infinite unless the
+tag-only solve is trustworthy, in which case `HEADING_STD_DEV_RADIANS` replaces it.
 
 ## Telemetry
 
 - `Vision/State`, `Vision/Accepted`, `Vision/RejectionReason` — one record per loop.
+- `Vision/Localized`, `Vision/SeedCount` — whether the pose was ever seeded from vision, and how
+  many seeds happened. `Vision/FusedTimestampAge_s` is the age of the last processed frame.
+- `Vision/HeadingFromTags` — true when this frame's yaw came from the tag-only solve instead of the
+  gyro.
+- `Vision/EstimatedPose` is logged only for frames that actually carry a tag, so it never shows a
+  fabricated origin.
 - `Vision/TagCount`, `Vision/TimestampSeconds`, `Vision/EstimatedPose` — from the frame, when present.
 - `Vision/Camera/HasTarget`, `Vision/Camera/TargetID`, `Vision/Camera/Heartbeat`,
   `Vision/Camera/Pipeline` — raw camera state, read every loop. `HasTarget` is the pipeline's
@@ -117,9 +158,16 @@ only one NT4 client/server pair is talking on the network.
 1. With vision disabled, confirm no NetworkTables writes appear and the robot drives normally.
 2. Enable vision only with the camera configured; confirm `Vision/State` reaches `TRACKING` while a
    tag is in view and `Vision/Accepted` is true.
-3. Confirm `Vision/RejectionReason` reads `STALE` or `DUPLICATE_TIMESTAMP` when the camera clock or
+3. Boot with every tag covered and confirm `Vision/Localized` is false and the pose stays at the
+   start pose. Uncover a tag and confirm `Vision/SeedCount` becomes 1 and the field pose jumps to the
+   tag-implied location once; cover it again and drive, and confirm the pose keeps moving instead of
+   returning to `0,0`.
+4. With the robot on blocks, show two tags (or one within `MAX_SEED_TAG_DISTANCE_METERS`) and confirm
+   `Vision/HeadingFromTags` turns true and the pose heading rotates to the tag-implied direction
+   without the robot moving.
+5. Confirm `Vision/RejectionReason` reads `STALE` or `DUPLICATE_TIMESTAMP` when the camera clock or
    network is misbehaving, rather than a burst of accepted frames.
-4. Wave a tag in front of the camera and confirm the reported pose moves in the expected direction
+6. Wave a tag in front of the camera and confirm the reported pose moves in the expected direction
    for the alliance; MegaTag2 reports the blue-origin pose.
-5. Confirm the mounting transform matches the real camera if `configureCameraPose` is enabled,
+7. Confirm the mounting transform matches the real camera if `configureCameraPose` is enabled,
    otherwise confirm it was set in the Limelight web UI.

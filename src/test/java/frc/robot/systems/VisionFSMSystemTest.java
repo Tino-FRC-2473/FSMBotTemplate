@@ -81,6 +81,80 @@ class VisionFSMSystemTest {
 		assertFalse(VisionFSMSystem.isTimestampNew(Double.NaN, 9.9));
 	}
 
+	@Test
+	void seedsFromMultipleTagsAtAnyAllowedDistance() {
+		assertTrue(VisionFSMSystem.isSeedQualitySufficient(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.05, 2, 5.5)));
+	}
+
+	@Test
+	void seedsFromSingleTagInsideSeedDistance() {
+		assertTrue(VisionFSMSystem.isSeedQualitySufficient(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.05, 1, 2.5)));
+	}
+
+	@Test
+	void doesNotSeedFromSingleTagOutsideSeedDistance() {
+		assertFalse(VisionFSMSystem.isSeedQualitySufficient(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.05, 1, 4.5)));
+	}
+
+	@Test
+	void usesTagHeadingFromMultipleTagsAtAnyAllowedDistance() {
+		assertTrue(VisionFSMSystem.isHeadingMeasurementUsable(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.05, 2, 4.0),
+			NOW_SECONDS, GENERIC_CONFIG));
+	}
+
+	@Test
+	void usesTagHeadingFromSingleTagInsideSeedDistance() {
+		assertTrue(VisionFSMSystem.isHeadingMeasurementUsable(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.05, 1, 2.5),
+			NOW_SECONDS, GENERIC_CONFIG));
+	}
+
+	@Test
+	void ignoresTagHeadingFromSingleTagOutsideSeedDistance() {
+		assertFalse(VisionFSMSystem.isHeadingMeasurementUsable(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.05, 1, 4.5),
+			NOW_SECONDS, GENERIC_CONFIG));
+	}
+
+	@Test
+	void ignoresTagHeadingFromAmbiguousFrame() {
+		assertFalse(VisionFSMSystem.isHeadingMeasurementUsable(
+			estimate(new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.9, 2, 1.0),
+			NOW_SECONDS, GENERIC_CONFIG));
+	}
+
+	@Test
+	void ignoresTagHeadingWithoutAnEstimate() {
+		assertFalse(VisionFSMSystem.isHeadingMeasurementUsable(
+			null, NOW_SECONDS, GENERIC_CONFIG));
+	}
+
+	@Test
+	void rejectionHappensBeforeAnySeedDecision() {
+		// A frame that would qualify for seeding must still be rejected when validation fails.
+		PoseEstimate ambiguous = estimate(
+			new Pose2d(1.0, 1.0, new Rotation2d()), 9.9, 0.9, 2, 1.0);
+
+		assertEquals(RejectionReason.HIGH_AMBIGUITY,
+			VisionFSMSystem.validateEstimate(ambiguous, NOW_SECONDS, GENERIC_CONFIG));
+		assertTrue(VisionFSMSystem.isSeedQualitySufficient(ambiguous));
+	}
+
+	private static PoseEstimate estimate(
+		Pose2d pose, double timestamp, double ambiguity, int tagCount, double avgTagDist) {
+		RawFiducial[] fiducials = new RawFiducial[tagCount];
+		for (int index = 0; index < tagCount; index++) {
+			fiducials[index] = new RawFiducial(
+				index + 1, 0.0, 0.0, 1.0, avgTagDist, avgTagDist, ambiguity);
+		}
+		return new PoseEstimate(
+			pose, timestamp, 30.0, tagCount, 0.0, avgTagDist, 1.0, fiducials, true);
+	}
+
 	private static PoseEstimate estimate(Pose2d pose, double timestamp, double ambiguity) {
 		return new PoseEstimate(
 			pose,

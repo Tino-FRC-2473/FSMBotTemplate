@@ -7,6 +7,7 @@ import java.util.function.UnaryOperator;
 import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
@@ -22,7 +23,9 @@ import frc.robot.imported.LimelightHelpers.RawFiducial;
 /**
  * Generic Limelight MegaTag2 localization FSM. Camera name, pipeline, mounting transform,
  * pose source, field bounds, quality thresholds, and measurement noise are injected by
- * each robot integration rather than baked into this reusable class.
+ * each robot integration rather than baked into this reusable class. The first trustworthy
+ * fix seeds the drivetrain pose; every later frame fuses normally. Translation comes from
+ * MegaTag2, heading from the tag-only solve because MegaTag2 echoes the supplied gyro.
  */
 public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	public enum VisionState {
@@ -151,12 +154,27 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		void accept(Pose2d pose, double timestampSeconds, Matrix<N3, N1> standardDeviations);
 	}
 
+	/** Seeder lets this FSM place the drivetrain pose at the first trustworthy vision fix. */
+	@FunctionalInterface
+	public interface VisionSeeder {
+		/**
+		 * Adopt one field pose as the estimator's new starting point.
+		 * @param pose field-relative pose to seed
+		 */
+		void seed(Pose2d pose);
+	}
+
 	private final Config config;
 	private final Supplier<Rotation3d> robotRotationSupplier;
 	private final Supplier<Double> angularVelocityDegreesPerSecondSupplier;
 	private final VisionConsumer visionConsumer;
+	private final VisionSeeder poseSeeder;
+	private final Matrix<N3, N1> headingStdDevs;
 	private double lastProcessedTimestampSeconds = Double.NEGATIVE_INFINITY;
 	private RejectionReason lastRejectionReason = RejectionReason.NO_TAGS;
+	private boolean localized;
+	private boolean lastHeadingFromTags;
+	private int seedCount;
 
 	/**
 	 * Create a vision FSM bound to a drivetrain's heading, yaw rate, and pose estimator.
@@ -168,7 +186,8 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 			cameraConfig,
 			drivetrain::getRobotRotation3d,
 			() -> Math.toDegrees(drivetrain.getAngularVelocityRadiansPerSecond()),
-			drivetrain::addVisionMeasurement);
+			drivetrain::addVisionMeasurement,
+			drivetrain::seedPoseFromVision);
 	}
 
 	/**
@@ -183,12 +202,34 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		Supplier<Rotation3d> rotationSupplier,
 		Supplier<Double> yawRateSupplier,
 		VisionConsumer poseConsumer) {
+		this(cameraConfig, rotationSupplier, yawRateSupplier, poseConsumer, pose -> { });
+	}
+
+	/**
+	 * Create a vision FSM with injected localization seams so seeding is testable without CAN.
+	 * @param cameraConfig camera name, quality gates, and measurement noise
+	 * @param rotationSupplier field-aligned robot rotation published for MegaTag2
+	 * @param yawRateSupplier measured yaw rate in degrees per second
+	 * @param poseConsumer consumer for accepted poses and their standard deviations
+	 * @param seeder replaces the estimator pose with the first trustworthy fix
+	 */
+	public VisionFSMSystem(
+		Config cameraConfig,
+		Supplier<Rotation3d> rotationSupplier,
+		Supplier<Double> yawRateSupplier,
+		VisionConsumer poseConsumer,
+		VisionSeeder seeder) {
 		this.config = Objects.requireNonNull(cameraConfig, "config");
 		this.robotRotationSupplier =
 			Objects.requireNonNull(rotationSupplier, "robotRotationSupplier");
 		this.angularVelocityDegreesPerSecondSupplier =
 			Objects.requireNonNull(yawRateSupplier, "angularVelocityDegreesPerSecondSupplier");
 		this.visionConsumer = Objects.requireNonNull(poseConsumer, "visionConsumer");
+		this.poseSeeder = Objects.requireNonNull(seeder, "seeder");
+		this.headingStdDevs = VecBuilder.fill(
+			this.config.measurementStdDevs().get(0, 0),
+			this.config.measurementStdDevs().get(1, 0),
+			VisionDefaults.HEADING_STD_DEV_RADIANS);
 
 		LimelightHelpers.setPipelineIndex(config.limelightName(), config.aprilTagPipeline());
 		LimelightHelpers.setLEDMode_PipelineControl(config.limelightName());
@@ -209,6 +250,7 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	@Override
 	public void reset() {
 		// Preserve the last timestamp across mode changes so a frame is only fused once.
+		// Localization is preserved for the same reason: a seeded pose must outlive a mode change.
 		lastRejectionReason = RejectionReason.NO_TAGS;
 		setCurrentState(VisionState.WAITING_FOR_TAGS);
 	}
@@ -225,10 +267,14 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 
 		PoseEstimate estimate =
 			LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(config.limelightName());
+		// MegaTag2 reports the heading it was told, so the tag-only solve from the same frame
+		// is the only measurement that can actually correct yaw.
+		PoseEstimate tagPoseEstimate =
+			LimelightHelpers.getBotPoseEstimate_wpiBlue(config.limelightName());
 		// Distinguishes "the pipeline sees no tag" from "a tag is visible but MegaTag2
 		// produced no localization pose" (missing field map or robot-space pose).
 		boolean cameraHasTarget = LimelightHelpers.getTV(config.limelightName());
-		boolean fused = fuseIfValid(estimate, cameraHasTarget);
+		boolean fused = fuseIfValid(estimate, tagPoseEstimate, cameraHasTarget);
 		setCurrentState(nextState(input));
 		logResult(estimate, lastRejectionReason, fused, cameraHasTarget);
 	}
@@ -251,18 +297,50 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 	}
 
 	// A rejected frame still consumes its timestamp so the same frame is never retried.
-	private boolean fuseIfValid(PoseEstimate estimate, boolean cameraHasTarget) {
+	private boolean fuseIfValid(
+		PoseEstimate estimate, PoseEstimate tagPoseEstimate, boolean cameraHasTarget) {
+		lastHeadingFromTags = false;
 		lastRejectionReason = validateIncoming(estimate, cameraHasTarget);
 		if (lastRejectionReason != RejectionReason.NONE) {
 			return false;
 		}
-		Pose2d pose = config.poseTransform().apply(estimate.pose);
+		Pose2d pose = config.poseTransform().apply(
+			poseWithTrustedHeading(estimate, tagPoseEstimate));
 		if (pose == null || !isFinitePose(pose)) {
 			lastRejectionReason = RejectionReason.INVALID_POSE;
 			return false;
 		}
-		visionConsumer.accept(pose, estimate.timestampSeconds, config.measurementStdDevs());
+		if (!localized && isSeedQualitySufficient(estimate)) {
+			// Filtering alone leaves the estimator's odometry track at the boot pose, so any
+			// discarded correction reveals (0,0). Adopting the first trustworthy fix moves
+			// odometry itself into field coordinates.
+			poseSeeder.seed(pose);
+			localized = true;
+			seedCount++;
+			return true;
+		}
+		visionConsumer.accept(pose, fuseTimestamp(estimate.timestampSeconds),
+			lastHeadingFromTags ? headingStdDevs : config.measurementStdDevs());
 		return true;
+	}
+
+	// MegaTag2 solves its position from the heading this robot publishes, so its theta carries
+	// no new information. Substitute the tag-only rotation when that fix is trustworthy; keep
+	// the gyro heading, and its huge theta, otherwise.
+	private Pose2d poseWithTrustedHeading(PoseEstimate estimate, PoseEstimate tagPoseEstimate) {
+		if (!isHeadingMeasurementUsable(tagPoseEstimate, Timer.getFPGATimestamp(), config)) {
+			return estimate.pose;
+		}
+		lastHeadingFromTags = true;
+		return new Pose2d(
+			estimate.pose.getTranslation(), tagPoseEstimate.pose.getRotation());
+	}
+
+	// The estimator silently drops a measurement newer than its newest odometry sample, which
+	// would discard a frame this validator already accepted.
+	private static double fuseTimestamp(double timestampSeconds) {
+		return Math.min(
+			timestampSeconds, Timer.getFPGATimestamp() - VisionDefaults.FUSE_MARGIN_SECONDS);
 	}
 
 	private RejectionReason validateIncoming(PoseEstimate estimate, boolean cameraHasTarget) {
@@ -331,6 +409,33 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		return hasAcceptableAmbiguity ? RejectionReason.NONE : RejectionReason.HIGH_AMBIGUITY;
 	}
 
+	/**
+	 * Whether a validated fix is trustworthy enough to replace the estimator's boot pose.
+	 * @param estimate estimate that already passed validation
+	 * @return true when several tags were seen, or one tag inside the seed distance limit
+	 */
+	public static boolean isSeedQualitySufficient(PoseEstimate estimate) {
+		Objects.requireNonNull(estimate, "estimate");
+		// Several tags are always well constrained; a lone tag only when it is close enough.
+		return estimate.tagCount >= VisionDefaults.MIN_SEED_TAGS
+			&& (estimate.tagCount > 1 || (Double.isFinite(estimate.avgTagDist)
+				&& estimate.avgTagDist <= VisionDefaults.MAX_SEED_TAG_DISTANCE_METERS));
+	}
+
+	/**
+	 * Whether the tag-only pose may correct the estimator's heading.
+	 * @param tagPoseEstimate tag-only (MegaTag1) estimate for the same camera frame
+	 * @param nowSeconds current FPGA timestamp, in seconds
+	 * @param config quality gates to apply
+	 * @return true when the fix is fresh, unambiguous, and of seed quality
+	 */
+	public static boolean isHeadingMeasurementUsable(
+		PoseEstimate tagPoseEstimate, double nowSeconds, Config config) {
+		return tagPoseEstimate != null
+			&& isSeedQualitySufficient(tagPoseEstimate)
+			&& validateEstimate(tagPoseEstimate, nowSeconds, config) == RejectionReason.NONE;
+	}
+
 	private static boolean isFinitePose(Pose2d pose) {
 		return Double.isFinite(pose.getX())
 			&& Double.isFinite(pose.getY())
@@ -354,6 +459,14 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		Logger.recordOutput("Vision/State", getCurrentState().toString());
 		Logger.recordOutput("Vision/Accepted", accepted);
 		Logger.recordOutput("Vision/RejectionReason", reason.toString());
+		Logger.recordOutput("Vision/Localized", localized);
+		Logger.recordOutput("Vision/SeedCount", seedCount);
+		Logger.recordOutput("Vision/HeadingFromTags", lastHeadingFromTags);
+		if (Double.isFinite(lastProcessedTimestampSeconds)) {
+			Logger.recordOutput(
+				"Vision/FusedTimestampAge_s",
+				Timer.getFPGATimestamp() - lastProcessedTimestampSeconds);
+		}
 		Logger.recordOutput("Vision/Camera/HasTarget", cameraHasTarget);
 		Logger.recordOutput(
 			"Vision/Camera/TargetID", LimelightHelpers.getFiducialID(config.limelightName()));
@@ -365,7 +478,7 @@ public class VisionFSMSystem extends FSMSystem<VisionFSMSystem.VisionState> {
 		if (estimate != null) {
 			Logger.recordOutput("Vision/TagCount", estimate.tagCount);
 			Logger.recordOutput("Vision/TimestampSeconds", estimate.timestampSeconds);
-			if (estimate.pose != null) {
+			if (estimate.pose != null && estimate.tagCount > 0) {
 				Logger.recordOutput("Vision/EstimatedPose", estimate.pose);
 			}
 		}

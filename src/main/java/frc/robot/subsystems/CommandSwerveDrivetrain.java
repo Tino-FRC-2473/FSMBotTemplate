@@ -49,6 +49,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 	private double lastSimTimeSeconds;
 	private static final double DETAILED_LOG_PERIOD_SECONDS = 0.05;
 	private static final double CONTROL_LOOP_PERIOD_SECONDS = 0.020;
+	private static final String SEEDED_POSE_LOG_KEY = "Drivetrain/Localization/SeededPose";
 	private static final double MILLISECONDS_PER_SECOND = 1000.0;
 	private final String[] moduleNames = {"FrontLeft", "FrontRight", "BackLeft", "BackRight"};
 	private double lastDetailedLogTimestampSeconds = Double.NEGATIVE_INFINITY;
@@ -308,6 +309,22 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 			alliance == DriverStation.Alliance.Red
 				? RED_OPERATOR_FORWARD
 				: BLUE_OPERATOR_FORWARD));
+	}
+
+	/**
+	 * Replace the estimator's field pose with a trusted vision fix so odometry continues from it.
+	 * @param visionRobotPoseMeters field-relative pose measured by the camera
+	 * @throws IllegalArgumentException when the pose is null or contains a nonfinite value
+	 */
+	public void seedPoseFromVision(Pose2d visionRobotPoseMeters) {
+		if (visionRobotPoseMeters == null
+			|| !Double.isFinite(visionRobotPoseMeters.getX())
+			|| !Double.isFinite(visionRobotPoseMeters.getY())
+			|| !Double.isFinite(visionRobotPoseMeters.getRotation().getRadians())) {
+			throw new IllegalArgumentException("Vision seed pose must be finite");
+		}
+		resetPose(visionRobotPoseMeters);
+		Logger.recordOutput(SEEDED_POSE_LOG_KEY, visionRobotPoseMeters);
 	}
 
 	/**
