@@ -2,6 +2,7 @@ package frc.robot;
 
 // WPILib Imports
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.XboxController;
 
 /**
  * Common class for providing driver inputs during Teleop.
@@ -14,11 +15,13 @@ public class TeleopInput {
 	/* ======================== Constants ======================== */
 	private static final int LEFT_JOYSTICK_PORT = 0;
 	private static final int RIGHT_JOYSTICK_PORT = 1;
+	private static final int CONTROLLER_PORT = 2;
 
 	/* ======================== Private variables ======================== */
 	// Input objects
 	private Joystick leftJoystick;
 	private Joystick rightJoystick;
+	private XboxController controller;
 
 	/* ======================== Constructor ======================== */
 	/**
@@ -30,6 +33,8 @@ public class TeleopInput {
 		leftJoystick = new Joystick(LEFT_JOYSTICK_PORT);
 
 		rightJoystick = new Joystick(RIGHT_JOYSTICK_PORT);
+
+		controller = new XboxController(CONTROLLER_PORT);
 	}
 
 	/* ======================== Public methods ======================== */
@@ -81,6 +86,42 @@ public class TeleopInput {
 	 */
 	public double getRightJoystickY() {
 		return rightJoystick.getY();
+	}
+
+	/**
+	 * Get A button in controller .
+	 * Used to lower the elevator.
+	 * @return whether button is pressed
+	 */
+	public boolean getElevateDownButton() {
+		return controller.getAButton();
+	}
+
+	/**
+	 * Get Y button in controller .
+	 * Used to elevate the elevator.
+	 * @return whether button is pressed
+	 */
+	public boolean getElevateUpButton() {
+		return controller.getYButton();
+	}
+
+	/**
+	 * Get X button in controller .
+	 * Used to pivot the elevator right.
+	 * @return whether button is pressed
+	 */
+	public boolean getPivotLeftButton() {
+		return controller.getXButton();
+	}
+
+	/**
+	 * Get B button in controller .
+	 * Used to pivot the elevator left.
+	 * @return whether button is pressed
+	 */
+	public boolean getPivotRightButton() {
+		return controller.getBButton();
 	}
 
 	/* ======================== Private methods ======================== */

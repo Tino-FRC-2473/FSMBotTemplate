@@ -1,7 +1,5 @@
 package frc.robot.systems;
 
-import static edu.wpi.first.units.Units.Inches;
-
 // Third party Hardware Imports
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
@@ -23,7 +21,6 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularAcceleration;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
-import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DigitalInput;
 import frc.robot.HardwareMap;
@@ -32,7 +29,6 @@ import frc.robot.HardwareMap;
 import frc.robot.TeleopInput;
 import frc.robot.Constants.ElevatorConstants;
 import frc.robot.motors.TalonFXWrapper;
-
 
 public class ElevatorFSMSystem {
 
@@ -84,13 +80,19 @@ public class ElevatorFSMSystem {
 	private DigitalInput elevatorRightLimitSwitch;
 	private DigitalInput elevatorLeftLimitSwitch;
 
+	private final VoltageOut gravityRequest = new VoltageOut(0);
+	private final MotionMagicVoltage elevatorHoldRequest = new MotionMagicVoltage(0);
+	private final MotionMagicVoltage pivotHoldRequest = new MotionMagicVoltage(0);
+	private double elevatorHoldTarget; // mechanism rotations
+	private double pivotHoldTarget; // mechanism rotations
+
 	private final DCMotor gearbox = DCMotor.getKrakenX60(1);
 
 	private final LinearSystem<N2, N1, N2> elevatorSystem = LinearSystemId.createElevatorSystem(
-		gearbox,
-		Units.lbsToKilograms(13.8),
-		Units.inchesToMeters(1),
-		15);
+			gearbox,
+			Units.lbsToKilograms(13.8),
+			Units.inchesToMeters(1),
+			15);
 
 	/* ======================== Constructor ======================== */
 
@@ -142,10 +144,10 @@ public class ElevatorFSMSystem {
 
 		// Configure follower motors
 		elevatorMotorUp2.setControl(new Follower(elevatorMotorUp1.getDeviceID(),
-			MotorAlignmentValue.Opposed));
+				MotorAlignmentValue.Opposed));
 
 		elevatorMotorPivot2.setControl(new Follower(elevatorMotorPivot1.getDeviceID(),
-			MotorAlignmentValue.Opposed));
+				MotorAlignmentValue.Opposed));
 
 		// Configure elevator up motors
 		var elevatorUpFeedback = elevatorUpConfigs.Feedback;
@@ -198,46 +200,42 @@ public class ElevatorFSMSystem {
 		// Apply elevator configurations
 		elevatorMotorUp1.getConfigurator().apply(elevatorUpConfigs);
 		BaseStatusSignal.setUpdateFrequencyForAll(
-			ElevatorConstants.UPDATE_FREQUENCY,
-			elevatorMotorUp1Pos,
-			elevatorMotorUp1Vel,
-			elevatorMotorUp1Accel,
-			elevatorMotorUp1Cur,
-			elevatorMotorUp1Vol
-		);
+				ElevatorConstants.UPDATE_FREQUENCY,
+				elevatorMotorUp1Pos,
+				elevatorMotorUp1Vel,
+				elevatorMotorUp1Accel,
+				elevatorMotorUp1Cur,
+				elevatorMotorUp1Vol);
 		elevatorMotorUp1.optimizeBusUtilization();
 
 		elevatorMotorUp2.getConfigurator().apply(elevatorUpConfigs);
 		BaseStatusSignal.setUpdateFrequencyForAll(
-			ElevatorConstants.UPDATE_FREQUENCY,
-			elevatorMotorUp2Pos,
-			elevatorMotorUp2Vel,
-			elevatorMotorUp2Accel,
-			elevatorMotorUp2Cur,
-			elevatorMotorUp2Vol
-		);
+				ElevatorConstants.UPDATE_FREQUENCY,
+				elevatorMotorUp2Pos,
+				elevatorMotorUp2Vel,
+				elevatorMotorUp2Accel,
+				elevatorMotorUp2Cur,
+				elevatorMotorUp2Vol);
 		elevatorMotorUp2.optimizeBusUtilization();
 
 		elevatorMotorPivot1.getConfigurator().apply(elevatorPivotConfigs);
 		BaseStatusSignal.setUpdateFrequencyForAll(
-			ElevatorConstants.UPDATE_FREQUENCY,
-			elevatorMotorPivot1Pos,
-			elevatorMotorPivot1Vel,
-			elevatorMotorPivot1Accel,
-			elevatorMotorPivot1Cur,
-			elevatorMotorPivot1Vol
-		);
+				ElevatorConstants.UPDATE_FREQUENCY,
+				elevatorMotorPivot1Pos,
+				elevatorMotorPivot1Vel,
+				elevatorMotorPivot1Accel,
+				elevatorMotorPivot1Cur,
+				elevatorMotorPivot1Vol);
 		elevatorMotorPivot1.optimizeBusUtilization();
 
 		elevatorMotorPivot2.getConfigurator().apply(elevatorPivotConfigs);
 		BaseStatusSignal.setUpdateFrequencyForAll(
-			ElevatorConstants.UPDATE_FREQUENCY,
-			elevatorMotorPivot2Pos,
-			elevatorMotorPivot2Vel,
-			elevatorMotorPivot2Accel,
-			elevatorMotorPivot2Cur,
-			elevatorMotorPivot2Vol
-		);
+				ElevatorConstants.UPDATE_FREQUENCY,
+				elevatorMotorPivot2Pos,
+				elevatorMotorPivot2Vel,
+				elevatorMotorPivot2Accel,
+				elevatorMotorPivot2Cur,
+				elevatorMotorPivot2Vol);
 		elevatorMotorPivot2.optimizeBusUtilization();
 
 		// Initialize limit switches
@@ -254,6 +252,7 @@ public class ElevatorFSMSystem {
 
 	/**
 	 * Get the current FSM state.
+	 *
 	 * @return current FSM state
 	 */
 	public ElevatorFSMState getCurrentState() {
@@ -270,27 +269,29 @@ public class ElevatorFSMSystem {
 	 */
 	public void reset() {
 		currentState = ElevatorFSMState.HOLD;
-
-		// Call one tick of update to ensure outputs reflect start state
+		elevatorHoldTarget = getElevatorPos();
+		pivotHoldTarget = getPivotPos();
 		update(null);
 	}
 
 	/**
 	 * Update FSM based on new inputs. This function only calls the FSM state
 	 * specific handlers.
+	 *
 	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *        the robot is in autonomous mode.
+	 *              the robot is in autonomous mode.
 	 */
 	public void update(TeleopInput input) {
 
 		if (input == null) {
+			handleHoldState(null);
 			return;
 		}
 
 		switch (currentState) {
-			case HOLD -> handleManualState(input);
-			case PIVOT -> handleGroundState(input);
-			case ELEVATE -> handleL2State(input);
+			case HOLD -> handleHoldState(input);
+			case PIVOT -> handlePivotState(input);
+			case ELEVATE -> handleElevateState(input);
 			default -> throw new IllegalStateException("Invalid state: " + currentState.toString());
 		}
 
@@ -299,50 +300,32 @@ public class ElevatorFSMSystem {
 
 	/* ======================== Private methods ======================== */
 	/**
- 	 * Decide the next state to transition to. This is a function of the inputs
- 	 * and the current state of this FSM. This method should not have any side
- 	 * effects on outputs. In other words, this method should only read or get
- 	 * values to decide what state to go to.
- 	 * @param input Global TeleopInput if robot in teleop mode or null if
- 	 *        the robot is in autonomous mode.
- 	 * @return FSM state for the next iteration
- 	 */
+	 * Decide the next state to transition to. This is a function of the inputs
+	 * and the current state of this FSM. This method should not have any side
+	 * effects on outputs. In other words, this method should only read or get
+	 * values to decide what state to go to.
+	 *
+	 * @param input Global TeleopInput if robot in teleop mode or null if
+	 *              the robot is in autonomous mode.
+	 * @return FSM state for the next iteration
+	 */
 	private ElevatorFSMState nextState(TeleopInput input) {
 		if (input == null) {
 			return ElevatorFSMState.HOLD;
 		}
-		switch (currentState) {
-			case HOLD:
-				if (isPivoting(input)) {
-					return ElevatorFSMState.PIVOT;
-				} else if (isElevating(input)) {
-					return ElevatorFSMState.ELEVATE;
-				}
-				return ElevatorFSMState.HOLD;
-
-			case ELEVATE:
-				if (isElevating(input)) {
-					return ElevatorFSMState.ELEVATE;
-				} else if (isPivoting(input)) {
-					return ElevatorFSMState.PIVOT;
-				}
-				return ElevatorFSMState.HOLD;
-
-			case PIVOT:
-				if (isElevating(input)) {
-					return ElevatorFSMState.ELEVATE;
-				} else if (isPivoting(input)) {
-					return ElevatorFSMState.PIVOT;
-				}
-				return ElevatorFSMState.HOLD;
-
-			default:
-				throw new IllegalStateException("Invalid state: " + currentState.toString());
+		// Same priority from every state: elevate > pivot > hold
+		if (isElevating(input)) {
+			return ElevatorFSMState.ELEVATE;
 		}
+		if (isPivoting(input)) {
+			return ElevatorFSMState.PIVOT;
+		}
+		return ElevatorFSMState.HOLD;
 	}
 
 	/**
 	 * Getter for the result of the elevator's bottom limit switch.
+	 *
 	 * @return whether the limit is reached
 	 */
 	private boolean isBottomLimitReached() {
@@ -351,6 +334,7 @@ public class ElevatorFSMSystem {
 
 	/**
 	 * Getter for the result of the elevator's upper limit switch.
+	 *
 	 * @return whether the limit is reached
 	 */
 	private boolean isUpperLimitReached() {
@@ -359,6 +343,7 @@ public class ElevatorFSMSystem {
 
 	/**
 	 * Getter for the result of the pivot's left limit switch.
+	 *
 	 * @return whether the limit is reached
 	 */
 	private boolean isLeftLimitSwitchReached() {
@@ -366,109 +351,167 @@ public class ElevatorFSMSystem {
 	}
 
 	/**
-	 * Getter for the result of the pivot's left limit switch.
+	 * Getter for the result of the pivot's right limit switch.
+	 *
 	 * @return whether the limit is reached
 	 */
 	private boolean isRightLimitSwitchReached() {
 		return elevatorRightLimitSwitch.get();
 	}
 
+	/**
+	 * Deadbanded elevator command. Single source of truth for both
+	 * state transitions and motor output.
+	 *
+	 * @param input Global TeleopInput
+	 * @return elevator command in [-1, 1]
+	 */
+	private double getElevatorInput(TeleopInput input) {
+		return MathUtil.applyDeadband(input.getLeftJoystickX(),
+				ElevatorConstants.JOYSTICK_DEADBAND);
+	}
+
+	/**
+	 * Deadbanded pivot command. Single source of truth for both
+	 * state transitions and motor output.
+	 *
+	 * @param input Global TeleopInput
+	 * @return pivot command in [-1, 1]
+	 */
+	private double getPivotInput(TeleopInput input) {
+		return MathUtil.applyDeadband(input.getRightJoystickX(),
+				ElevatorConstants.JOYSTICK_DEADBAND);
+	}
+
 	private boolean isPivoting(TeleopInput input) {
-		if (Math.abs(input.getRightJoystickX()) > ElevatorConstants.JOYSTICK_THRESHOLD
-				|| Math.abs(input.getRightJoystickY()) > ElevatorConstants.JOYSTICK_THRESHOLD) {
-			return true;
-		}
-		return false;
+		return input.getPivotLeftButton() || input.getPivotRightButton();
 	}
 
 	private boolean isElevating(TeleopInput input) {
-		if (Math.abs(input.getLeftJoystickX()) > ElevatorConstants.JOYSTICK_THRESHOLD
-				|| Math.abs(input.getLeftJoystickY()) > ElevatorConstants.JOYSTICK_THRESHOLD) {
-			return true;
-		}
-		return false;
+		return input.getElevateUpButton() || input.getElevateDownButton();
 	}
 
-	private Distance getElevatorpos() {
-		return Inches.of(elevatorMotorUp1.getPosition().getValueAsDouble());
+	/**
+	 * Zero the encoder at the bottom limit and block motion past either elevator
+	 * limit.
+	 *
+	 * @param signalInput requested elevator command
+	 * @return elevator command after limits are applied
+	 */
+	private double applyElevatorLimits(double signalInput) {
+		if (isBottomLimitReached()) {
+			elevatorMotorUp1.setPosition(0);
+			if (signalInput < 0) {
+				return 0;
+			}
+		}
+		if (isUpperLimitReached() && signalInput > 0) {
+			return 0;
+		}
+		return signalInput;
+	}
+
+	/**
+	 * Block pivot motion past either pivot limit.
+	 *
+	 * @param signalInput requested pivot command
+	 * @return pivot command after limits are applied
+	 */
+	private double applyPivotLimits(double signalInput) {
+		// Assumes positive = toward the right limit switch; flip if your mechanism is
+		// the opposite
+		if (isRightLimitSwitchReached() && signalInput > 0) {
+			return 0;
+		}
+		if (isLeftLimitSwitchReached() && signalInput < 0) {
+			return 0;
+		}
+		return signalInput;
+	}
+
+	private double getElevatorPos() {
+		return elevatorMotorUp1.getPosition().getValueAsDouble();
+	}
+
+	private double getPivotPos() {
+		return elevatorMotorPivot1.getPosition().getValueAsDouble();
+	}
+
+	private void holdElevator() {
+		elevatorMotorUp1.setControl(elevatorHoldRequest.withPosition(elevatorHoldTarget));
+	}
+
+	private void holdPivot() {
+		elevatorMotorPivot1.setControl(pivotHoldRequest.withPosition(pivotHoldTarget));
 	}
 
 	/* ------------------------ FSM state handlers ------------------------ */
 
 	/**
-	 * Handle behavior in MANUAL.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *        the robot is in autonomous mode.
+	 * HOLD: both mechanisms servo to their last captured position.
+	 *
+	 * @param input the input received from teleop input
 	 */
-	private void handleManualState(TeleopInput input) {
-		double signalInput = input.getManualElevatorMovementInput();
-		signalInput = MathUtil.applyDeadband(signalInput,
-			ElevatorConstants.ELEVATOR_JOYSTICK_INPUT_DEADBAND);
-		if (isBottomLimitReached()) {
-			elevatorMotorUp1.setPosition(0);
-			if (signalInput < 0) {
-				elevatorMotorUp1.set(0); //don't go even further down if you hit the lower limit!
-				return;
-			}
+	private void handleHoldState(TeleopInput input) {
+		holdElevator();
+		holdPivot();
+	}
+
+	/**
+	 * ELEVATE: up/down buttons drive the elevator at constant speed, pivot is held
+	 * in place.
+	 *
+	 * @param input the input received from teleop input.
+	 */
+	private void handleElevateState(TeleopInput input) {
+		double speed = 0;
+		if (input.getElevateUpButton() && !input.getElevateDownButton()) {
+			speed = ElevatorConstants.ELEVATOR_MANUAL_SCALE;
+		} else if (input.getElevateDownButton() && !input.getElevateUpButton()) {
+			speed = -ElevatorConstants.ELEVATOR_MANUAL_SCALE;
 		}
 
-		if (signalInput == 0 && elevatorMotorUp1.getPosition().getValueAsDouble()
-			> ElevatorConstants.KG_CHECK.in(Inches)) {
-			elevatorMotorUp1.setControl(new VoltageOut(ElevatorConstants.ELEVATOR_KG));
+		speed = applyElevatorLimits(speed);
+
+		if (speed == 0) {
+			holdElevator();
 		} else {
-			elevatorMotorUp1.set(signalInput * ElevatorConstants.ELEVATOR_MANUAL_SCALE);
+			elevatorMotorUp1.set(speed);
+			elevatorHoldTarget = getElevatorPos(); // keep target following us while moving
 		}
+
+		holdPivot();
 	}
 
 	/**
-	 * Handle behavior in GROUND.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *        the robot is in autonomous mode.
+	 * PIVOT: left/right buttons drive the pivot at constant speed, elevator is held
+	 * in place.
+	 *
+	 * @param input the input received from teleop input.
 	 */
-	private void handleGroundState(TeleopInput input) {
-		if (isBottomLimitReached()) {
-			elevatorMotorUp1.setPosition(0);
+	private void handlePivotState(TeleopInput input) {
+		double speed = 0;
+		if (input.getPivotRightButton() && !input.getPivotLeftButton()) {
+			speed = ElevatorConstants.PIVOT_MANUAL_SCALE;
+		} else if (input.getPivotLeftButton() && !input.getPivotRightButton()) {
+			speed = -ElevatorConstants.PIVOT_MANUAL_SCALE;
+		}
+
+		speed = applyPivotLimits(speed);
+
+		if (speed == 0) {
+			holdPivot();
 		} else {
-			elevatorMotorUp1.setControl(
-				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_GROUND.in(Inches))
-			);
+			elevatorMotorPivot1.set(speed);
+			pivotHoldTarget = getPivotPos();
 		}
+
+		holdElevator();
 	}
 
-	/**
-	 * Handle behavior in LEVEL2.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *        the robot is in autonomous mode.
-	 */
-	private void handleL2State(TeleopInput input) {
-		elevatorMotorUp1.setControl(
-			motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L2.in(Inches))
-		);
-	}
-
-	/**
-	 * Handle behavior in LEVEL3.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *        the robot is in autonomous mode.
-	 */
-	private void handleL3State(TeleopInput input) {
-		elevatorMotorUp1.setControl(
-				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L3.in(Inches))
-		);
-	}
-
-	/**
-	 * Handle behavior in LEVEL4.
-	 * @param input Global TeleopInput if robot in teleop mode or null if
-	 *        the robot is in autonomous mode.
-	 */
-	private void handleL4State(TeleopInput input) {
-		elevatorMotorUp1.setControl(
-				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L4.in(Inches))
-		);
-	}
 	/**
 	 * Is elevator at ground boolean accessor.
+	 *
 	 * @return whether or not elevator is at ground.
 	 */
 	public boolean isElevatorAtGround() {

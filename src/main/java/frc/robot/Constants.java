@@ -39,18 +39,22 @@ public class Constants {
 		public static final double RIGHT_BRAKE_ENGAGED_POS = 0.8;
 		public static final double RIGHT_BRAKE_RELEASED_POS = 0.2;
 
-		public static final double JOYSTICK_THRESHOLD = 0.1;
+		public static final double JOYSTICK_DEADBAND = 0.1;
+		public static final double ELEVATOR_MANUAL_SCALE = 0.3; // tuning needed
+		public static final double PIVOT_MANUAL_SCALE = 0.2; // tuning needed
 
 		public static final double ELEVATOR_MIN_HEIGHT = 0;
 		public static final double ELEVATOR_MAX_HEIGHT = ELEVATOR_UPPER_THRESHOLD;
 
 		public static final double ELEVATOR_SPOOL_DIAMETER_INCHES = 1.0;
 		public static final double ELEVATOR_CASCADE_MULTIPLIER = 3.0;
-		public static final double ELEVATOR_INCHES_PER_ROTATION =
-			Math.PI * ELEVATOR_SPOOL_DIAMETER_INCHES * ELEVATOR_CASCADE_MULTIPLIER;
+		public static final double ELEVATOR_INCHES_PER_ROTATION = Math.PI * ELEVATOR_SPOOL_DIAMETER_INCHES
+				* ELEVATOR_CASCADE_MULTIPLIER;
 
 		// Gravity hold
 		public static final double ELEVATOR_KG = 0;
 		public static final double PIVOT_KG = 0;
+
+		public static final double UPDATE_FREQUENCY = 100;
 	}
 }
