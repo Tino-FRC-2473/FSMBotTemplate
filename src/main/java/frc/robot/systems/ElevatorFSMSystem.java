@@ -11,12 +11,9 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
-import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
-import com.ctre.phoenix6.signals.NeutralModeValue;
-import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.numbers.N1;
@@ -304,66 +301,14 @@ public class ElevatorFSMSystem {
 			return;
 		}
 
-		if (Robot.isSimulation()) {
-			double partOfWayUp =
-				elevatorSim.getPositionMeters()
-				/ Units.inchesToMeters(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD.in(Inches));
-			// double partOfWayUpPerSecond =
-			// 	elevatorSim.getVelocityMetersPerSecond()
-			// 	/ Units.inchesToMeters(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD.in(Inches));
-			Logger.recordOutput("part way up", partOfWayUp);
-			((TalonFXWrapper) elevatorMotorUp1).setRawPosition(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD
-				.in(Inches) * partOfWayUp);
-			// elevatorMotorUp1.getSimState()
-			//.setRotorVelocity(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD.in(Inches)
-			//* partOfWayUpPerSecond);
-
-		}
-
-		elevatorSim.setInputVoltage(elevatorMotorUp1.get() * SimConstants.BATTERY_VOLTAGE);
-		Logger.recordOutput("elevator setpoint", elevatorMotorUp1.get());
-		Logger.recordOutput("simulated battery", SimulatedBattery.getBatteryVoltage().in(Volts));
-		elevatorSim.update(ElevatorConstants.UPDATE_PERIOD_SECS);
-
 		switch (currentState) {
-			case MANUAL -> handleManualState(input);
-			case GROUND -> handleGroundState(input);
-			case LEVEL2 -> handleL2State(input);
-			case LEVEL3 -> handleL3State(input);
-			case LEVEL4 -> handleL4State(input);
+			case HOLD -> handleManualState(input);
+			case PIVOT -> handleGroundState(input);
+			case ELEVATE -> handleL2State(input);
 			default -> throw new IllegalStateException("Invalid state: " + currentState.toString());
 		}
 
 		currentState = nextState(input);
-	}
-
-	/**
-	 * Updates the logging information for the elevator system.
-	 */
-	public void updateLogging() {
-		Logger.recordOutput("Elevator encoder", elevatorMotorUp1.getPosition().getValueAsDouble());
-		Logger.recordOutput("Elevator velocity", elevatorMotorUp1.getVelocity().getValueAsDouble());
-
-		Logger.recordOutput("Elevator bottom limit switch pressed", isBottomLimitReached());
-
-		Logger.recordOutput("Elevator State", currentState.toString());
-		Logger.recordOutput("Elevator Voltage", elevatorMotorUp1.getMotorVoltage().getValueAsDouble());
-
-		Logger.recordOutput("Elevator Accel", elevatorMotorUp1.getAcceleration().getValueAsDouble());
-
-		Logger.recordOutput("Elev Inrage GRND?", inRange(getElevatorpos(),
-			ElevatorConstants.ELEVATOR_TARGET_GROUND));
-
-		Logger.recordOutput("Elev Inrage L4?", inRange(getElevatorpos(),
-			ElevatorConstants.ELEVATOR_TARGET_L4));
-
-		Logger.recordOutput("ROTR POS", elevatorMotorUp1.getRotorPosition().getValueAsDouble());
-		Logger.recordOutput("ROTR VELO", elevatorMotorUp1.getRotorVelocity().getValueAsDouble());
-
-		// telemetry and logging
-		MechLogging.getInstance().updateElevatorPose3d(Angle.ofBaseUnits(
-			elevatorSim.getPositionMeters(), Radians
-		));
 	}
 
 	/* ======================== Private methods ======================== */
@@ -378,64 +323,32 @@ public class ElevatorFSMSystem {
  	 */
 	private ElevatorFSMState nextState(TeleopInput input) {
 		if (input == null) {
-			return ElevatorFSMState.MANUAL;
+			return ElevatorFSMState.HOLD;
 		}
 		switch (currentState) {
-			case MANUAL:
-				if (input.isGroundButtonPressed()
-					&& !isBottomLimitReached()
-					&& !input.isL4ButtonPressed()
-					&& !input.isL2ButtonPressed()
-					&& !input.isL3ButtonPressed()) {
-					return ElevatorFSMState.GROUND;
+			case HOLD:
+				if (isPivoting(input)) {
+					return ElevatorFSMState.PIVOT;
+				} else if (isElevating(input)) {
+					return ElevatorFSMState.ELEVATE;
 				}
-				if (input.isL2ButtonPressed()
-					&& funnelSystem.isHoldingCoral()
-					&& !input.isL4ButtonPressed()
-					&& !input.isGroundButtonPressed()
-					&& !input.isL3ButtonPressed()) {
-					return ElevatorFSMState.LEVEL2;
-				}
-				if (input.isL3ButtonPressed()
-					&& funnelSystem.isHoldingCoral()
-					&& !input.isL4ButtonPressed()
-					&& !input.isGroundButtonPressed()
-					&& !input.isL2ButtonPressed()) {
-					return ElevatorFSMState.LEVEL3;
-				}
-				if (input.isL4ButtonPressed()
-					&& funnelSystem.isHoldingCoral()
-					&& !input.isGroundButtonPressed()
-					&& !input.isL2ButtonPressed()
-					&& !input.isL3ButtonPressed()) {
-					return ElevatorFSMState.LEVEL4;
-				}
-				return ElevatorFSMState.MANUAL;
+				return ElevatorFSMState.HOLD;
 
-			case GROUND:
-				if (isBottomLimitReached() || inRange(getElevatorpos(),
-					ElevatorConstants.ELEVATOR_TARGET_GROUND)) {
-					return ElevatorFSMState.MANUAL;
+			case ELEVATE:
+				if (isElevating(input)) {
+					return ElevatorFSMState.ELEVATE;
+				} else if (isPivoting(input)) {
+					return ElevatorFSMState.PIVOT;
 				}
-				return ElevatorFSMState.GROUND;
+				return ElevatorFSMState.HOLD;
 
-			case LEVEL2:
-				if (inRange(getElevatorpos(), ElevatorConstants.ELEVATOR_TARGET_L2)) {
-					return ElevatorFSMState.MANUAL;
+			case PIVOT:
+				if (isElevating(input)) {
+					return ElevatorFSMState.ELEVATE;
+				} else if (isPivoting(input)) {
+					return ElevatorFSMState.PIVOT;
 				}
-				return ElevatorFSMState.LEVEL2;
-
-			case LEVEL3:
-				if (inRange(getElevatorpos(), ElevatorConstants.ELEVATOR_TARGET_L3)) {
-					return ElevatorFSMState.MANUAL;
-				}
-				return ElevatorFSMState.LEVEL3;
-
-			case LEVEL4:
-				if (inRange(getElevatorpos(), ElevatorConstants.ELEVATOR_TARGET_L4)) {
-					return ElevatorFSMState.MANUAL;
-				}
-				return ElevatorFSMState.LEVEL4;
+				return ElevatorFSMState.HOLD;
 
 			default:
 				throw new IllegalStateException("Invalid state: " + currentState.toString());
@@ -447,16 +360,47 @@ public class ElevatorFSMSystem {
 	 * @return whether the limit is reached
 	 */
 	private boolean isBottomLimitReached() {
-		if (Robot.isSimulation()) {
-			return elevatorMotorUp1.getPosition().getValueAsDouble()
-				< ElevatorConstants.ELEVATOR_INRANGE_VALUE.in(Inches);
-		}
-		return groundLimitSwitch.get(); // switch is normally open
+		return elevatorDownLimitSwitch.get();
 	}
 
-	private boolean inRange(Distance currentPos, Distance targetPos) {
-		return (currentPos.compareTo(targetPos.minus(ElevatorConstants.ELEVATOR_INRANGE_VALUE)) > 0)
-				&& currentPos.compareTo(targetPos.plus(ElevatorConstants.ELEVATOR_INRANGE_VALUE)) < 0;
+	/**
+	 * Getter for the result of the elevator's upper limit switch.
+	 * @return whether the limit is reached
+	 */
+	private boolean isUpperLimitReached() {
+		return elevatorUpLimitSwitch.get();
+	}
+
+	/**
+	 * Getter for the result of the pivot's left limit switch.
+	 * @return whether the limit is reached
+	 */
+	private boolean isLeftLimitSwitchReached() {
+		return elevatorLeftLimitSwitch.get();
+	}
+
+	/**
+	 * Getter for the result of the pivot's left limit switch.
+	 * @return whether the limit is reached
+	 */
+	private boolean isRightLimitSwitchReached() {
+		return elevatorRightLimitSwitch.get();
+	}
+
+	private boolean isPivoting(TeleopInput input) {
+		if (Math.abs(input.getRightJoystickX()) > ElevatorConstants.JOYSTICK_THRESHOLD
+				|| Math.abs(input.getRightJoystickY()) > ElevatorConstants.JOYSTICK_THRESHOLD) {
+			return true;
+		}
+		return false;
+	}
+
+	private boolean isElevating(TeleopInput input) {
+		if (Math.abs(input.getLeftJoystickX()) > ElevatorConstants.JOYSTICK_THRESHOLD
+				|| Math.abs(input.getLeftJoystickY()) > ElevatorConstants.JOYSTICK_THRESHOLD) {
+			return true;
+		}
+		return false;
 	}
 
 	private Distance getElevatorpos() {

@@ -51,5 +51,6 @@ public class Constants {
 		public static final double VELOCITY_STOP_TOLERANCE = 0.05;
 
 		public static final double UPDATE_FREQUENCY = 100;
+		public static final double JOYSTICK_THRESHOLD = 0.1;
 	}
 }
