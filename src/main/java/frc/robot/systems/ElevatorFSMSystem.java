@@ -1,11 +1,8 @@
 package frc.robot.systems;
 
 import static edu.wpi.first.units.Units.Inches;
-import static edu.wpi.first.units.Units.Radians;
-import static edu.wpi.first.units.Units.Volts;
 
 // Third party Hardware Imports
-import org.littletonrobotics.junction.Logger;
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
@@ -29,10 +26,7 @@ import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.simulation.ElevatorSim;
 import frc.robot.HardwareMap;
-import frc.robot.Robot;
 
 // Robot Imports
 import frc.robot.TeleopInput;
@@ -97,14 +91,6 @@ public class ElevatorFSMSystem {
 		Units.lbsToKilograms(13.8),
 		Units.inchesToMeters(1),
 		15);
-
-	private ElevatorSim elevatorSim = new ElevatorSim(
-		elevatorSystem,
-		gearbox,
-		0,
-		Units.inchesToMeters(ElevatorConstants.ELEVATOR_UPPER_THRESHOLD),
-		true,
-		0);
 
 	/* ======================== Constructor ======================== */
 
@@ -481,156 +467,11 @@ public class ElevatorFSMSystem {
 				motionRequest.withPosition(ElevatorConstants.ELEVATOR_TARGET_L4.in(Inches))
 		);
 	}
-
-	/**
-	 * Is elevator at L2 boolean accessor.
-	 * @return whether or not elevator is at L2.
-	 */
-	public boolean isElevatorAtL2() {
-		return inRange(getElevatorpos(), ElevatorConstants.ELEVATOR_TARGET_L2);
-	}
-
-	/**
-	 * Is elevator at L3 boolean accessor.
-	 * @return whether or not elevator is at L3.
-	 */
-	public boolean isElevatorAtL3() {
-		return inRange(getElevatorpos(), ElevatorConstants.ELEVATOR_TARGET_L3);
-	}
-
-	/**
-	 * Is elevator at L4 boolean accessor.
-	 * @return whether or not elevator is at L4.
-	 */
-	public boolean isElevatorAtL4() {
-		return inRange(getElevatorpos(), ElevatorConstants.ELEVATOR_TARGET_L4);
-	}
-
 	/**
 	 * Is elevator at ground boolean accessor.
 	 * @return whether or not elevator is at ground.
 	 */
 	public boolean isElevatorAtGround() {
 		return isBottomLimitReached();
-	}
-
-	/* ---- Elevator Commands ---- */
-
-	/** Superclass for elevator commands. */
-	abstract class ElevatorCommand extends Command {
-		private Distance target;
-
-		@Override
-		public void execute() {
-			elevatorMotorUp1.setControl(
-				motionRequest.withPosition(target.in(Inches))
-			);
-		}
-
-		@Override
-		public boolean isFinished() {
-			return inRange(getElevatorpos(), target);
-		}
-
-		@Override
-		public void end(boolean interrupted) { }
-
-		protected void setTarget(Distance newTarget) {
-			this.target = newTarget;
-		}
-
-		protected Distance getTarget() {
-			return this.target;
-		}
-	}
-
-	/** A command that waits for one second. */
-	class WaitCommand extends Command {
-		private Timer timer;
-
-		@Override
-		public void initialize() {
-			timer = new Timer();
-			timer.reset();
-			timer.start();
-		}
-
-		@Override
-		public boolean isFinished() {
-			return timer.get() > 1;
-		}
-
-		@Override
-		public void end(boolean interrupted) {
-			timer.reset();
-		}
-	}
-
-	/** A command that moves the elevator to the Ground position. */
-	class ElevatorGroundCommand extends ElevatorCommand {
-		ElevatorGroundCommand() {
-			this.setTarget(ElevatorConstants.ELEVATOR_TARGET_GROUND);
-		}
-	}
-
-	/** A command that moves the elevator to the L2 position. */
-	class ElevatorL2Command extends ElevatorCommand {
-		ElevatorL2Command() {
-			this.setTarget(ElevatorConstants.ELEVATOR_TARGET_L2);
-		}
-	}
-
-	/** A command that moves the elevator to the L3 position. */
-	class ElevatorL3Command extends ElevatorCommand {
-		ElevatorL3Command() {
-			this.setTarget(ElevatorConstants.ELEVATOR_TARGET_L3);
-		}
-	}
-
-	/** A command that moves the elevator to the L4 position. */
-	class ElevatorL4Command extends ElevatorCommand {
-		ElevatorL4Command() {
-			this.setTarget(ElevatorConstants.ELEVATOR_TARGET_L4);
-		}
-	}
-
-	/**
-	 * Creates a Command to move the elevator to the ground position.
-	 * @return A new elevator ground command.
-	 */
-	public Command elevatorGroundCommand() {
-		return new ElevatorGroundCommand();
-	}
-
-	/**
-	 * Creates a Command to move the elevator to the L2 position.
-	 * @return A new elevator L2 command.
-	 */
-	public Command elevatorL2Command() {
-		return new ElevatorL2Command();
-	}
-
-	/**
-	 * Creates a Command to move the elevator to the L3 position.
-	 * @return A new elevator L3 command.
-	 */
-	public Command elevatorL3Command() {
-		return new ElevatorL3Command();
-	}
-
-	/**
-	 * Creates a Command to move the elevator to the L4 position.
-	 * @return A new elevator L4 command.
-	 */
-	public Command elevatorL4Command() {
-		return new ElevatorL4Command();
-	}
-
-	/**
-	 * Creates a Command that waits for a specified duration.
-	 * @return A new wait command.
-	 */
-	public Command waitCommand() {
-		return new WaitCommand();
 	}
 }
